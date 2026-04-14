@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/fcmtokens",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\FcmTokens\\": "app/",
+            "Modules\\FcmTokens\\Database\\Factories\\": "database/factories/",
+            "Modules\\FcmTokens\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\FcmTokens\\Tests\\": "tests/"
+        }
+    }
+}

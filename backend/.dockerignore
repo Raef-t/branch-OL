@@ -1,0 +1,10 @@
+/.env
+/node_modules
+/vendor
+/storage
+/public/storage
+/Modules.zip
+/.git
+/.github
+*.md
+.phpunit.result.cache

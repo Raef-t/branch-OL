@@ -1,0 +1,11 @@
+{
+    "name": "PaymentEditRequests",
+    "alias": "paymenteditrequests",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\PaymentEditRequests\\Providers\\PaymentEditRequestsServiceProvider"
+    ],
+    "files": []
+}

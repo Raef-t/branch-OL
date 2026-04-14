@@ -1,0 +1,117 @@
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { baseApiConfig } from "./baseApi";
+
+export const batcheSubjectsApi = createApi({
+  reducerPath: "batcheSubjectsApi",
+  ...baseApiConfig,
+  tagTypes: ["BatchSubjects"],
+
+  endpoints: (builder) => ({
+    // ========================
+    // GET SUBJECTS BY BATCH
+    // ========================
+    getBatchSubjects: builder.query({
+      query: (batchId) => ({
+        url: `/batcheSubjects/${batchId}/subjects`,
+        method: "GET",
+      }),
+      providesTags: (r, e, batchId) => [
+        { type: "BatchSubjects", id: `BATCH-${batchId}` },
+      ],
+    }),
+
+    // ========================
+    // GET SUBJECTS BY BRANCH
+    // ========================
+    getBranchSubjects: builder.query({
+      query: (branchId) => ({
+        url: `/batcheSubjects/branches/${branchId}/subjects`,
+        method: "GET",
+      }),
+      providesTags: (r, e, branchId) => [
+        { type: "BatchSubjects", id: `BRANCH-${branchId}` },
+      ],
+    }),
+
+    getBatchSubjectsSummary: builder.query({
+      query: () => ({
+        url: `/batcheSubjects/summary`,
+        method: "GET",
+      }),
+      providesTags: [{ type: "BatchSubjects", id: "SUMMARY" }],
+    }),
+
+    // ========================
+    // ASSIGN INSTRUCTOR SUBJECT TO BATCH
+    // ========================
+    assignInstructorSubjectToBatch: builder.mutation({
+      query: ({ batch_id, instructor_subject_id, weekly_lessons, notes }) => ({
+        url: `/batcheSubjects/assign-instructor-subject`,
+        method: "POST",
+        data: { batch_id, instructor_subject_id, weekly_lessons, notes },
+      }),
+      invalidatesTags: (r, e, { batch_id }) => [
+        { type: "BatchSubjects", id: `BATCH-${batch_id}` },
+      ],
+    }),
+
+    // ========================
+    // REMOVE INSTRUCTOR SUBJECT FROM BATCH
+    // ========================
+    removeInstructorSubjectFromBatch: builder.mutation({
+      query: ({ batch_id, instructor_subject_id }) => ({
+        url: `/batcheSubjects/remove-instructor-subject`,
+        method: "POST",
+        data: { batch_id, instructor_subject_id },
+      }),
+      invalidatesTags: (r, e, { batch_id }) => [
+        { type: "BatchSubjects", id: `BATCH-${batch_id}` },
+      ],
+    }),
+
+    // ========================
+    // UPDATE BATCH SUBJECT
+    // ========================
+    updateBatchSubject: builder.mutation({
+      query: ({ id, instructor_subject_id, weekly_lessons, notes }) => ({
+        url: `/batcheSubjects/update-batch-subject/${id}`,
+        method: "PUT",
+        data: { instructor_subject_id, weekly_lessons, notes },
+      }),
+      invalidatesTags: [{ type: "BatchSubjects", id: "LIST" }],
+    }),
+
+    // ========================
+    // DELETE BATCH SUBJECT
+    // ========================
+    deleteBatchSubject: builder.mutation({
+      query: (id) => ({
+        url: `/batcheSubjects/delete-batch-subject/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "BatchSubjects", id: "LIST" }],
+    }),
+
+    deleteTeacherSubjectByIds: builder.mutation({
+      query: ({ instructor_id, subject_id }) => ({
+        url: `/subjects/delete-teacher-subject-by-ids`,
+        method: "POST",
+        data: { instructor_id, subject_id },
+      }),
+      invalidatesTags: [{ type: "SubjectTeachers", id: "LIST" }],
+    }),
+  }),
+});
+
+export const {
+  useGetBatchSubjectsSummaryQuery,
+  useGetBatchSubjectsQuery,
+  useLazyGetBatchSubjectsQuery,
+  useGetBranchSubjectsQuery,
+  useLazyGetBranchSubjectsQuery,
+  useAssignInstructorSubjectToBatchMutation,
+  useRemoveInstructorSubjectFromBatchMutation,
+  useUpdateBatchSubjectMutation,
+  useDeleteBatchSubjectMutation,
+  useDeleteTeacherSubjectByIdsMutation,
+} = batcheSubjectsApi;

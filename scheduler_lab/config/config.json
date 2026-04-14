@@ -1,0 +1,28 @@
+{
+  "allow_empty_slots": true,
+  "empty_slot_penalty": 2,
+  "max_solutions_to_generate": 6,
+  "time_limit_seconds": 150,
+  "solver_workers": 4,
+  "teacher_preference_weights": {
+    "preferred_days": "10",
+    "avoid_days": "20",
+    "preferred_slots": "5",
+    "avoid_slots": "10"
+  },
+  "teacher_priority_levels": {
+    "1": {
+      "name": "دكتوراه/خبير",
+      "weight_multiplier": 1.5
+    },
+    "2": {
+      "name": "ماجستير/متوسط",
+      "weight_multiplier": 1.0
+    },
+    "3": {
+      "name": "بكالوريوس/مبتدئ",
+      "weight_multiplier": 0.7
+    }
+  },
+  "default_allow_same_subject_same_day": false
+}

@@ -1,0 +1,11 @@
+{
+    "name": "BatchStudentSubjects",
+    "alias": "batchstudentsubjects",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\BatchStudentSubjects\\Providers\\BatchStudentSubjectsServiceProvider"
+    ],
+    "files": []
+}

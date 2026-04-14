@@ -1,0 +1,11 @@
+{
+    "name": "Instructors",
+    "alias": "instructors",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Instructors\\Providers\\InstructorsServiceProvider"
+    ],
+    "files": []
+}

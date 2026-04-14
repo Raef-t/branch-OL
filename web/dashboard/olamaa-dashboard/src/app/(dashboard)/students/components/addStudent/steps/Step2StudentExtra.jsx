@@ -1,0 +1,402 @@
+"use client";
+
+import { useState } from "react";
+
+import InputField from "@/components/common/InputField";
+import SearchableSelect from "@/components/common/SearchableSelect";
+import StepButtonsSmart from "@/components/common/StepButtonsSmart";
+import DatePickerSmart from "@/components/common/DatePickerSmart";
+import { Controller } from "react-hook-form";
+
+import { useGetCitiesQuery } from "@/store/services/citiesApi";
+import { useGetStudentStatusesQuery } from "@/store/services/studentStatusesApi";
+import { useGetBusesQuery } from "@/store/services/busesApi";
+import { useGetKnowWaysQuery } from "@/store/services/knowWaysApi";
+import {
+  useGetSchoolsQuery,
+  useAddSchoolMutation,
+} from "@/store/services/schoolsApi";
+import toast from "react-hot-toast";
+import { useEffect } from "react";
+
+/* helpers */
+const fileRequired = (files) => {
+  if (!files) return "حقل الصورة مطلوب";
+  if (files instanceof FileList) return files.length > 0 || "حقل الصورة مطلوب";
+  if (Array.isArray(files)) return files.length > 0 || "حقل الصورة مطلوب";
+  return "حقل الصورة مطلوب";
+};
+
+export default function Step2StudentExtra({
+  control,
+  register,
+  errors,
+  watch,
+  setValue,
+  trigger,
+  isEdit,
+  onNext,
+  onBack,
+}) {
+  /* data */
+  const { data: citiesRes } = useGetCitiesQuery();
+  const { data: statusesRes } = useGetStudentStatusesQuery();
+  const { data: busesRes } = useGetBusesQuery();
+  const { data: knowWaysRes } = useGetKnowWaysQuery();
+  const { data: schoolsRes } = useGetSchoolsQuery();
+  const [addSchool] = useAddSchoolMutation();
+  const [typedSchool, setTypedSchool] = useState("");
+
+  const enrollmentDate = watch("enrollment_date");
+  const startAttendanceDate = watch("start_attendance_date");
+
+  // تفعيل التحقق الفوري عند تغيير التواريخ
+  useEffect(() => {
+    if (enrollmentDate && startAttendanceDate) {
+      trigger("start_attendance_date");
+    }
+  }, [enrollmentDate, startAttendanceDate, trigger]);
+
+  const cities = citiesRes?.data || [];
+  const statuses = statusesRes?.data || [];
+  const buses = busesRes?.data || [];
+  const knowWays = knowWaysRes?.data || [];
+  const schools = schoolsRes?.data || [];
+
+  const today = new Date().toISOString().split("T")[0];
+
+  /* defaults */
+  useEffect(() => {
+    if (isEdit) return;
+
+    if (!watch("enrollment_date")) {
+      setValue("enrollment_date", today);
+    }
+    if (!watch("start_attendance_date")) {
+      setValue("start_attendance_date", today);
+    }
+
+    if (cities.length > 0 && !watch("city_id")) {
+      const target = cities.find(
+        (c) => c.name === "حلب" || c.name?.includes("حلب"),
+      );
+      if (target) setValue("city_id", String(target.id));
+    }
+  }, [cities, isEdit, setValue, watch, today]);
+
+  const handleAddNewSchool = async (name, onChange) => {
+    try {
+      const res = await addSchool({ name }).unwrap();
+      const newSchool = res?.data;
+      if (newSchool) {
+        onChange(String(newSchool.id));
+        toast.success(`تمت إضافة مدرسة "${name}" بنجاح`);
+      }
+    } catch (err) {
+      toast.error(err?.data?.message || "فشل في إضافة المدرسة");
+    }
+  };
+
+  const handleInternalNext = async () => {
+    const currentId = watch("school_id");
+    // إذا لم يتم اختيار مدرسة، وكان هناك نص مكتوب
+    if (!currentId && typedSchool.trim()) {
+      // هل يطابق مدرسة موجودة أصلاً ولكن لم يضغط عليها؟
+      const exists = schools.find(
+        (s) =>
+          s.name?.toLowerCase().trim() === typedSchool.toLowerCase().trim(),
+      );
+      if (exists) {
+        setValue("school_id", String(exists.id));
+      } else {
+        // إضافة مدرسة جديدة تلقائياً
+        await handleAddNewSchool(typedSchool.trim(), (id) =>
+          setValue("school_id", id),
+        );
+      }
+    }
+    onNext();
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* ===== Header ثابت (اختياري) ===== */}
+      <div className="shrink-0 bg-white/90 backdrop-blur border-b border-gray-100 px-1 pb-3 pt-1">
+        <div className="flex items-center justify-between">
+          <h3 className="text-[#6F013F] font-semibold text-sm">
+            بيانات إضافية
+          </h3>
+          {/* <span className="text-[11px] text-gray-400">الخطوة 2</span> */}
+        </div>
+      </div>
+
+      {/* ===== Body (سكرول على الحقول فقط) ===== */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-1 py-4">
+        <div className="space-y-4">
+          {/* enrollment_date (DatePickerSmart) */}
+          <Controller
+            control={control}
+            name="enrollment_date"
+            rules={{ required: "تاريخ التسجيل مطلوب" }}
+            render={({ field }) => (
+              <div className="space-y-1">
+                <DatePickerSmart
+                  label="تاريخ التسجيل"
+                  required
+                  value={field.value || ""}
+                  onChange={(iso) => field.onChange(iso || "")}
+                  format="DD/MM/YYYY"
+                  allowClear
+                />
+                {!!errors?.enrollment_date?.message && (
+                  <p className="text-[12px] text-red-600">
+                    {errors.enrollment_date.message}
+                  </p>
+                )}
+              </div>
+            )}
+          />
+
+          {/* start_attendance_date (اختياري) */}
+          <Controller
+            control={control}
+            name="start_attendance_date"
+            rules={{
+              validate: (value) => {
+                if (!value || !enrollmentDate) return true;
+                if (value < enrollmentDate) {
+                  return "تاريخ بدء الحضور لا يمكن أن يكون قبل تاريخ التسجيل";
+                }
+                return true;
+              },
+            }}
+            render={({ field }) => (
+              <div className="space-y-1">
+                <DatePickerSmart
+                  label="تاريخ بدء الحضور"
+                  value={field.value || ""}
+                  onChange={(iso) => field.onChange(iso || "")}
+                  format="DD/MM/YYYY"
+                  allowClear
+                />
+                {!!errors?.start_attendance_date?.message && (
+                  <p className="text-[12px] text-red-600">
+                    {errors.start_attendance_date.message}
+                  </p>
+                )}
+              </div>
+            )}
+          />
+
+          {/* gender */}
+          <Controller
+            control={control}
+            name="gender"
+            rules={{ required: "الجنس مطلوب" }}
+            render={({ field }) => (
+              <SearchableSelect
+                label="الجنس"
+                required
+                value={field.value ? String(field.value) : null}
+                onChange={(v) => {
+                  const val = typeof v === "object" ? v?.value : v;
+                  field.onChange(val ? String(val) : null);
+                }}
+                options={[
+                  { value: "male", label: "ذكر" },
+                  { value: "female", label: "أنثى" },
+                ]}
+                placeholder="اختر الجنس"
+                allowClear
+              />
+            )}
+          />
+
+          {/* school_id (المدرسة الحالية/السابقة) */}
+          <Controller
+            control={control}
+            name="school_id"
+            render={({ field }) => (
+              <SearchableSelect
+                label="المدرسة"
+                value={field.value ? String(field.value) : null}
+                onChange={(v) => {
+                  const val = typeof v === "object" ? v?.value : v;
+                  field.onChange(val ? String(val) : null);
+                }}
+                onAddNew={(val) => handleAddNewSchool(val, field.onChange)}
+                onQueryChange={(q) => setTypedSchool(q)}
+                options={schools.map((s) => ({
+                  value: String(s.id),
+                  label: s.name,
+                }))}
+                placeholder="اختر المدرسة أو اكتب اسم مدرسة جديدة"
+                allowClear
+              />
+            )}
+          />
+
+          {/* how_know_institute */}
+          <Controller
+            control={control}
+            name="how_know_institute"
+            render={({ field }) => (
+              <SearchableSelect
+                label="كيف عرفت بالمعهد؟"
+                value={field.value ? String(field.value) : null}
+                onChange={(v) => {
+                  const val = typeof v === "object" ? v?.value : v;
+                  field.onChange(val ? String(val) : null);
+                }}
+                options={knowWays.map((k) => ({
+                  value: String(k.name),
+                  label: k.name,
+                }))}
+                placeholder="اختر الطريقة"
+                allowClear
+              />
+            )}
+          />
+
+          {/* city_id */}
+          <Controller
+            control={control}
+            name="city_id"
+            render={({ field }) => (
+              <SearchableSelect
+                label="المدينة"
+                value={field.value ? String(field.value) : null}
+                onChange={(v) => {
+                  const val = typeof v === "object" ? v?.value : v;
+                  field.onChange(val ? String(val) : null);
+                }}
+                options={cities.map((c) => ({
+                  value: String(c.id),
+                  label: c.name,
+                }))}
+                placeholder="اختر المدينة"
+                allowClear
+              />
+            )}
+          />
+
+          {/* status_id */}
+          <Controller
+            control={control}
+            name="status_id"
+            render={({ field }) => (
+              <SearchableSelect
+                label="حالة الطالب"
+                value={field.value ? String(field.value) : null}
+                onChange={(v) => {
+                  const val = typeof v === "object" ? v?.value : v;
+                  field.onChange(val ? String(val) : null);
+                }}
+                options={statuses.map((s) => ({
+                  value: String(s.id),
+                  label: s.name,
+                }))}
+                placeholder="اختر الحالة"
+                allowClear
+              />
+            )}
+          />
+
+          {/* bus_id */}
+          <Controller
+            control={control}
+            name="bus_id"
+            render={({ field }) => (
+              <SearchableSelect
+                label="الحافلة"
+                value={field.value ? String(field.value) : null}
+                onChange={(v) => {
+                  const val = typeof v === "object" ? v?.value : v;
+                  field.onChange(val ? String(val) : null);
+                }}
+                options={buses.map((b) => ({
+                  value: String(b.id),
+                  label: b.name || b.code || `Bus #${b.id}`,
+                }))}
+                placeholder="اختر الحافلة"
+                allowClear
+              />
+            )}
+          />
+
+          {/* health_status */}
+          <InputField
+            label="الحالة الصحية"
+            register={register("health_status", {
+              maxLength: { value: 200, message: "الحد الأقصى 200 محرف" },
+            })}
+            error={errors?.health_status?.message}
+          />
+
+          {/* psychological_status */}
+          <InputField
+            label="الحالة النفسية"
+            register={register("psychological_status", {
+              maxLength: { value: 200, message: "الحد الأقصى 200 محرف" },
+            })}
+            error={errors?.psychological_status?.message}
+          />
+
+          {/* notes */}
+          <InputField
+            label="ملاحظات"
+            register={register("notes", {
+              maxLength: { value: 200, message: "الحد الأقصى 200 محرف" },
+            })}
+            error={errors?.notes?.message}
+          />
+
+          {/* files */}
+          <div className="space-y-3 border border-gray-200 rounded-xl p-4 bg-white">
+            <p className="text-sm font-medium text-gray-700">الملفات</p>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm text-gray-700">صورة شخصية</label>
+              <input
+                type="file"
+                accept="image/*"
+                className="text-sm"
+                // {...register("profile_photo", { validate: fileRequired })}
+              />
+              {!!errors?.profile_photo?.message && (
+                <p className="text-[12px] text-red-600">
+                  {errors.profile_photo.message}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm text-gray-700">صورة بطاقة الهوية</label>
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                className="text-sm"
+                // {...register("id_card_photo", { validate: fileRequired })}
+              />
+              {!!errors?.id_card_photo?.message && (
+                <p className="text-[12px] text-red-600">
+                  {errors.id_card_photo.message}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ===== Footer ثابت (الأزرار) ===== */}
+      <div className="shrink-0 bg-white/90 backdrop-blur border-t border-gray-100 px-1 pt-3 pb-2">
+        <StepButtonsSmart
+          step={2}
+          total={6}
+          onNext={handleInternalNext}
+          onBack={onBack}
+        />
+      </div>
+    </div>
+  );
+}

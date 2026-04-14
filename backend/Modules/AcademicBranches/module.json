@@ -1,0 +1,11 @@
+{
+    "name": "AcademicBranches",
+    "alias": "academicbranches",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\AcademicBranches\\Providers\\AcademicBranchesServiceProvider"
+    ],
+    "files": []
+}

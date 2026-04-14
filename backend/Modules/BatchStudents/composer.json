@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/batchstudents",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\BatchStudents\\": "app/",
+            "Modules\\BatchStudents\\Database\\Factories\\": "database/factories/",
+            "Modules\\BatchStudents\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\BatchStudents\\Tests\\": "tests/"
+        }
+    }
+}

@@ -1,0 +1,95 @@
+import { createApi } from "@reduxjs/toolkit/query/react";
+import ENDPOINTS from "@/lib/constants/endpoints";
+import { baseApiConfig } from "./baseApi";
+
+export const batchesApi = createApi({
+  reducerPath: "batchesApi",
+  ...baseApiConfig,
+  tagTypes: ["Batches"],
+
+  endpoints: (builder) => ({
+    getBatches: builder.query({
+      query: (params) => ({
+        url: ENDPOINTS.BATCHES,
+        method: "GET",
+        params,
+      }),
+      providesTags: (r) =>
+        r?.data
+          ? [
+            ...(Array.isArray(r?.data) ? r.data : Array.isArray(r?.data?.data) ? r.data.data : []).map(({ id }) => ({ type: "Batches", id })),
+            { type: "Batches", id: "LIST" },
+          ]
+          : [{ type: "Batches", id: "LIST" }],
+    }),
+
+    getBatchesStats: builder.query({
+      query: (params) => ({
+        url: `${ENDPOINTS.BATCHES}/stats`,
+        method: "GET",
+        params,
+      }),
+      providesTags: ["Batches"],
+    }),
+
+
+    getBatch: builder.query({
+      query: (id) => ({ url: `${ENDPOINTS.BATCHES}/${id}`, method: "GET" }),
+      providesTags: (r, e, id) => [{ type: "Batches", id }],
+    }),
+
+    addBatch: builder.mutation({
+      query: (data) => ({
+        url: ENDPOINTS.BATCHES,
+        method: "POST",
+        data,
+      }),
+      invalidatesTags: [{ type: "Batches", id: "LIST" }],
+    }),
+
+    updateBatch: builder.mutation({
+      query: ({ id, ...data }) => ({
+        url: `${ENDPOINTS.BATCHES}/${id}`,
+        method: "PUT",
+        data,
+      }),
+      invalidatesTags: (r, e, { id }) => [
+        { type: "Batches", id },
+        { type: "Batches", id: "LIST" },
+      ],
+    }),
+
+    deleteBatch: builder.mutation({
+      query: (id) => ({
+        url: `${ENDPOINTS.BATCHES}/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (r, e, id) => [
+        { type: "Batches", id },
+        { type: "Batches", id: "LIST" },
+      ],
+    }),
+
+    toggleBatchStatus: builder.mutation({
+      query: ({ id, field }) => ({
+        url: `${ENDPOINTS.BATCHES}/${id}/toggle-status`,
+        method: "PATCH",
+        data: { field },
+      }),
+      invalidatesTags: (r, e, { id }) => [
+        { type: "Batches", id },
+        { type: "Batches", id: "LIST" },
+      ],
+    }),
+  }),
+});
+
+export const {
+  useGetBatchesQuery,
+  useGetBatchesStatsQuery,
+  useGetBatchQuery,
+  useAddBatchMutation,
+  useUpdateBatchMutation,
+  useDeleteBatchMutation,
+  useToggleBatchStatusMutation,
+} = batchesApi;

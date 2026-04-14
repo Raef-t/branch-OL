@@ -1,0 +1,11 @@
+{
+    "name": "NotificationAttachments",
+    "alias": "notificationattachments",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\NotificationAttachments\\Providers\\NotificationAttachmentsServiceProvider"
+    ],
+    "files": []
+}

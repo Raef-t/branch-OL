@@ -1,0 +1,11 @@
+{
+    "name": "KnowledgeSources",
+    "alias": "knowledgesources",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\KnowledgeSources\\Providers\\KnowledgeSourcesServiceProvider"
+    ],
+    "files": []
+}

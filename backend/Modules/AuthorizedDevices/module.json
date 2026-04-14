@@ -1,0 +1,11 @@
+{
+    "name": "AuthorizedDevices",
+    "alias": "authorizeddevices",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\AuthorizedDevices\\Providers\\AuthorizedDevicesServiceProvider"
+    ],
+    "files": []
+}

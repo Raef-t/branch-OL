@@ -1,0 +1,11 @@
+{
+    "name": "InstituteBranches",
+    "alias": "institutebranches",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\InstituteBranches\\Providers\\InstituteBranchesServiceProvider"
+    ],
+    "files": []
+}

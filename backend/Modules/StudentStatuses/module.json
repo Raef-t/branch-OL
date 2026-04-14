@@ -1,0 +1,11 @@
+{
+    "name": "StudentStatuses",
+    "alias": "studentstatuses",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\StudentStatuses\\Providers\\StudentStatusesServiceProvider"
+    ],
+    "files": []
+}

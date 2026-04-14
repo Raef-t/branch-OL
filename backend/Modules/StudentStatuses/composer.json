@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/studentstatuses",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\StudentStatuses\\": "app/",
+            "Modules\\StudentStatuses\\Database\\Factories\\": "database/factories/",
+            "Modules\\StudentStatuses\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\StudentStatuses\\Tests\\": "tests/"
+        }
+    }
+}

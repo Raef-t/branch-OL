@@ -1,0 +1,236 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --line: #5b5b5b;
+  /* لون الخط العمودي والوصلة الافتراضي */
+  --accent: #BD036B;
+  /* اللون الوردي الغامق */
+  --pill-start: #F9C7DC;
+  /* تدرج حبّة عند الهوفر - بداية */
+  --pill-end: #FDE9F3;
+  /* تدرج حبّة عند الهوفر - نهاية */
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@font-face {
+  font-family: "Tajawal";
+  src: url("/fonts/Tajawal-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  /* يولّد لك class جاهزة: font-tajawal */
+  --font-tajawal: "Tajawal", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+  /* (اختياري) خلّيها هي الخط الافتراضي للسنس */
+  --font-sans: var(--font-tajawal);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  background: #FBFBFB;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+html[dir="rtl"] body {
+  font-family: var(--font-tajawal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ====== Firefox ====== */
+* {
+  /* حجم الشريط: auto | thin | none */
+  scrollbar-width: thin;
+  /* الترتيب: لون الـ thumb ثم لون الـ track */
+  scrollbar-color: #6F013F #f3e8f3;
+}
+
+/* ====== Chrome / Edge / Safari (WebKit) ====== */
+*::-webkit-scrollbar {
+  width: 10px;
+  /* عرض شريط التمرير العمودي */
+  height: 10px;
+  /* ارتفاع شريط التمرير الأفقي */
+}
+
+*::-webkit-scrollbar-track {
+  background: #f3e8f3;
+  /* لون المسار الخلفي */
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #6F013F;
+  /* لون مقبض التمرير */
+  border-radius: 8px;
+  /* استدارة الحواف */
+  border: 2px solid #f3e8f3;
+  /* فراغ بصري حول الـ thumb */
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  /* درجة أغمق عند التحويم لتحسين التباين */
+  background-color: #5a0132;
+}
+
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.15s ease-out forwards;
+}
+
+thead tr:first-child th:first-child {
+  border-top-right-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
+}
+
+thead tr:first-child th:last-child {
+  border-top-left-radius: 0.5rem;
+  border-bottom-left-radius: 0.5rem;
+}
+
+/* Toast animations */
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(16px) translateY(6px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1);
+  }
+}
+
+@keyframes toastOut {
+  from {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(16px) translateY(6px) scale(0.98);
+  }
+}
+
+.animate-enter {
+  animation: toastIn 220ms ease-out both;
+}
+
+.animate-leave {
+  animation: toastOut 180ms ease-in both;
+}
+
+/*_______________________________________________*/
+/* مخفي بالشاشة */
+.print-only {
+  display: none;
+}
+
+/* وقت الطباعة */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  #print-root,
+  #print-root * {
+    visibility: visible !important;
+  }
+
+  #print-root {
+    display: block !important;
+    position: absolute;
+    inset: 0;
+    padding: 16px;
+  }
+
+  .print-page {
+    page-break-after: always;
+  }
+
+  .print-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  .print-subtitle {
+    margin-top: 14px;
+    margin-bottom: 8px;
+    font-weight: 700;
+  }
+
+  .print-card {
+    border: 1px solid #ddd;
+    padding: 10px;
+    border-radius: 8px;
+    display: grid;
+    gap: 6px;
+  }
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .print-table th,
+  .print-table td {
+    border: 1px solid #ddd;
+    padding: 6px;
+    text-align: right;
+    vertical-align: top;
+  }
+
+  .print-empty {
+    color: #666;
+    padding: 8px 0;
+  }
+
+  .print-break {
+    height: 1px;
+  }
+}

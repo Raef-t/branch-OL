@@ -1,0 +1,11 @@
+{
+    "name": "DoorSessions",
+    "alias": "doorsessions",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\DoorSessions\\Providers\\DoorSessionsServiceProvider"
+    ],
+    "files": []
+}

@@ -1,0 +1,7 @@
+ortools>=9.0
+pandas>=1.4
+numpy>=1.21
+openpyxl>=3.0
+fastapi>=0.80
+uvicorn>=0.18
+python-multipart>=0.0.5

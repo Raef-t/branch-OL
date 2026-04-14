@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/authorizeddevices",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\AuthorizedDevices\\": "app/",
+            "Modules\\AuthorizedDevices\\Database\\Factories\\": "database/factories/",
+            "Modules\\AuthorizedDevices\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\AuthorizedDevices\\Tests\\": "tests/"
+        }
+    }
+}

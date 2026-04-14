@@ -1,0 +1,11 @@
+{
+    "name": "ExamResultEditRequests",
+    "alias": "examresulteditrequests",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\ExamResultEditRequests\\Providers\\ExamResultEditRequestsServiceProvider"
+    ],
+    "files": []
+}

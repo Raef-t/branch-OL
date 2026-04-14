@@ -1,0 +1,16 @@
+<?php
+
+namespace Modules\ExamResultEditRequests\Database\Seeders;
+
+use Illuminate\Database\Seeder;
+
+class ExamResultEditRequestsDatabaseSeeder extends Seeder
+{
+    /**
+     * Run the database seeds.
+     */
+    public function run(): void
+    {
+        // $this->call([]);
+    }
+}

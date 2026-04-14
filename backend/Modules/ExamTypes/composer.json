@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/examtypes",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\ExamTypes\\": "app/",
+            "Modules\\ExamTypes\\Database\\Factories\\": "database/factories/",
+            "Modules\\ExamTypes\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\ExamTypes\\Tests\\": "tests/"
+        }
+    }
+}

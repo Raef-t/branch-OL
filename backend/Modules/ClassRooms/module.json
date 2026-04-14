@@ -1,0 +1,11 @@
+{
+    "name": "ClassRooms",
+    "alias": "classrooms",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\ClassRooms\\Providers\\ClassRoomsServiceProvider"
+    ],
+    "files": []
+}

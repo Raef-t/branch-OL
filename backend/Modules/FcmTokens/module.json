@@ -1,0 +1,11 @@
+{
+    "name": "FcmTokens",
+    "alias": "fcmtokens",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\FcmTokens\\Providers\\FcmTokensServiceProvider"
+    ],
+    "files": []
+}

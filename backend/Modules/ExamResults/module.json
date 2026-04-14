@@ -1,0 +1,11 @@
+{
+    "name": "ExamResults",
+    "alias": "examresults",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\ExamResults\\Providers\\ExamResultsServiceProvider"
+    ],
+    "files": []
+}

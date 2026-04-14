@@ -1,0 +1,582 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useSelector } from "react-redux";
+import { notify } from "@/lib/helpers/toastify";
+
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import ActionsRow from "@/components/common/ActionsRow";
+import Breadcrumb from "@/components/common/Breadcrumb";
+import SearchableSelect from "@/components/common/SearchableSelect";
+import StudentDeleteModal from "./components/StudentDeleteModal";
+import StudentsTable from "./components/StudentsTable";
+import AddStudentModal from "./components/addStudent/AddStudentModal";
+
+// ✅ مودلات التعديل الموجودة عندك
+import EditStudentInfoModal from "./components/EditStudentInfoModal";
+import EditFamilyModal from "./components/EditFamilyModal";
+import EditContactsModal from "./components/EditContactsModal";
+import EditAcademicModal from "./components/EditAcademicModal";
+import StudentDetailsModal from "./components/StudentDetailsModal";
+
+import { useGetBatchesQuery } from "@/store/services/batchesApi";
+
+// ✅ hooks من studentsApi (مثل ما ثبّتناه)
+import {
+  useGetStudentsDetailsQuery,
+  useLazyGetStudentDetailsByIdQuery,
+  useDeleteStudentMutation,
+} from "@/store/services/studentsApi";
+import PageSkeleton from "@/components/common/PageSkeleton";
+import AddStudentToBatchModal from "./components/AddStudentToBatchModal";
+import AddContractModal from "./components/AddContractModal";
+import PrintExportActions from "@/components/common/PrintExportActions";
+
+/* ================= helpers ================= */
+function esc(s) {
+  return String(s ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function splitFullName(fullName) {
+  const t = String(fullName || "").trim();
+  if (!t) return { first_name: "", last_name: "" };
+  const parts = t.split(/\s+/);
+  if (parts.length === 1) return { first_name: parts[0], last_name: "" };
+  return { first_name: parts[0], last_name: parts.slice(1).join(" ") };
+}
+
+function normalizeStudentsDetailsResponse(res) {
+  // يدعم شكلين:
+  // 1) { status, message, data: [...] }
+  // 2) [...] مباشرة
+  if (!res) return [];
+  if (Array.isArray(res)) return res;
+  if (Array.isArray(res?.data)) return res.data;
+  return [];
+}
+
+function normalizeStudentDetailsResponse(res) {
+  // يدعم شكلين:
+  // 1) { status, message, data: {...} }
+  // 2) {...} مباشرة
+  if (!res) return null;
+  if (res?.data && typeof res.data === "object") return res.data;
+  if (typeof res === "object") return res;
+  return null;
+}
+
+/* ================= component ================= */
+export default function StudentsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    const add = searchParams.get("add");
+    if (add === "1") setIsAddOpen(true);
+  }, [searchParams]);
+  /* ================= Redux filters ================= */
+  const search = useSelector((s) => s.search.values.students || "");
+  const branchId = useSelector((s) => s.search.values.branch || "");
+
+  /* ================= API (list) ================= */
+  const {
+    data: studentsDetailsRes,
+    isLoading: loadingStudents,
+    refetch: refetchStudents,
+  } = useGetStudentsDetailsQuery({
+    institute_branch_id: branchId || undefined,
+  });
+
+  const studentsDetails = useMemo(
+    () => normalizeStudentsDetailsResponse(studentsDetailsRes),
+    [studentsDetailsRes],
+  );
+
+  const { data: batchesRes, isLoading: batchesLoading } = useGetBatchesQuery({
+    institute_branch_id: branchId || undefined,
+  });
+
+  const batchOptions = useMemo(() => {
+    const arr = Array.isArray(batchesRes?.data)
+      ? batchesRes.data
+      : Array.isArray(batchesRes?.data?.data)
+        ? batchesRes.data.data
+        : Array.isArray(batchesRes?.data?.batches)
+          ? batchesRes.data.batches
+          : Array.isArray(batchesRes)
+            ? batchesRes
+            : [];
+
+    return arr.map((b) => ({
+      key: b.id,
+      value: String(b.id),
+      label: b.name,
+      // البيانات الإضافية لفلترة الطالب
+      institute_branch_id: b.institute_branch_id,
+      academic_branch_id: b.academic_branch_id,
+    }));
+  }, [batchesRes]);
+
+  const [deleteStudent, { isLoading: deleting }] = useDeleteStudentMutation();
+  const [activeAcademicRecordId, setActiveAcademicRecordId] = useState(null);
+
+  /* ================= API (lazy details for one) ================= */
+  const [fetchStudentDetails, { isFetching: loadingOne }] =
+    useLazyGetStudentDetailsByIdQuery();
+
+  /* ================= Local state ================= */
+  const [selectedBatchId, setSelectedBatchId] = useState("");
+  const [selectedIds, setSelectedIds] = useState([]);
+
+  // add student modal
+  const [isAddOpen, setIsAddOpen] = useState(false);
+
+  // delete
+  const [openDelete, setOpenDelete] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState(null);
+
+  // active student (details)
+  const [activeStudentId, setActiveStudentId] = useState(null);
+  const [activeStudent, setActiveStudent] = useState(null);
+
+  // modals open
+  const [openDetails, setOpenDetails] = useState(false);
+  const [openEditInfo, setOpenEditInfo] = useState(false);
+  const [openFamily, setOpenFamily] = useState(false);
+  const [openContacts, setOpenContacts] = useState(false);
+  const [openAcademic, setOpenAcademic] = useState(false);
+  const [openPayments, setOpenPayments] = useState(false);
+  const [openAddToBatch, setOpenAddToBatch] = useState(false);
+  const [openAddContract, setOpenAddContract] = useState(false);
+  const onAddToBatch = async (row) => {
+    closeAllModals();
+    setOpenAddToBatch(true);
+    await ensureStudentDetails(row);
+  };
+
+  const onAddContract = async (row) => {
+    closeAllModals();
+    setOpenAddContract(true);
+    await ensureStudentDetails(row);
+  };
+
+  /* ================= Prepare rows for StudentsTable =================
+     StudentsTable يعتمد first_name/last_name + institute_branch + batch
+  */
+  const tableStudents = useMemo(() => {
+    return (Array.isArray(studentsDetails) ? studentsDetails : []).map((s) => {
+      const { first_name, last_name } = splitFullName(s.full_name);
+      return {
+        ...s,
+        first_name: s.first_name ?? first_name,
+        last_name: s.last_name ?? last_name,
+        institute_branch_id: s.institute_branch?.id ?? s.institute_branch_id,
+        batch_id: s.batch?.id ?? s.batch_id,
+      };
+    });
+  }, [studentsDetails]);
+
+  /* ================= Filtering ================= */
+  const filteredStudents = useMemo(() => {
+    return (tableStudents || []).filter((s) => {
+      const full = String(s.full_name || `${s.first_name} ${s.last_name}`)
+        .toLowerCase()
+        .trim();
+
+      const matchSearch = full.includes(String(search || "").toLowerCase());
+      const matchBatch =
+        !selectedBatchId ||
+        String(s.batch_id ?? s.batch?.id) === String(selectedBatchId);
+      const matchBranch =
+        !branchId ||
+        !s.institute_branch_id ||
+        String(s.institute_branch_id) === String(branchId);
+
+      return matchSearch && matchBatch && matchBranch;
+    });
+  }, [tableStudents, search, selectedBatchId, branchId]);
+
+  /* ================= Selection ================= */
+  const isAllSelected =
+    filteredStudents.length > 0 &&
+    selectedIds.length === filteredStudents.length;
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [search, selectedBatchId, branchId]);
+
+  /* ================= helpers: open modal with ensured details ================= */
+  const ensureStudentDetails = async (row) => {
+    const id = row?.id;
+    if (!id) return null;
+
+    setActiveStudentId(id);
+
+    // إذا نفس الطالب محمّل من قبل → لا تعيد طلب
+    if (activeStudent && String(activeStudent.id) === String(id)) {
+      return activeStudent;
+    }
+
+    // تحديث الحالة فوراً بالبيانات المتوفرة (مثل الاسم والـ ID) لتجنب ظهور بيانات الطالب السابق في المودال
+    setActiveStudent(row);
+
+    try {
+      const res = await fetchStudentDetails(id).unwrap();
+      const details = normalizeStudentDetailsResponse(res);
+
+      if (!details) return null;
+
+      // تأكيد وجود first_name/last_name للـ EditStudentInfoModal
+      const { first_name, last_name } = splitFullName(details.full_name);
+      const normalized = {
+        ...details,
+        first_name: details.first_name ?? first_name,
+        last_name: details.last_name ?? last_name,
+        institute_branch_id:
+          details.institute_branch?.id ?? details.institute_branch_id,
+        branch_id: details.branch?.id ?? details.branch_id,
+        city_id: details.city?.id ?? details.city_id,
+        status_id: details.status?.id ?? details.status_id,
+        bus_id: details.bus?.id ?? details.bus_id,
+      };
+
+      setActiveStudent(normalized);
+      return normalized;
+    } catch (e) {
+      notify.error(e?.data?.message || "فشل جلب تفاصيل الطالب");
+      return null;
+    }
+  };
+
+  const closeAllModals = () => {
+    setOpenDetails(false);
+    setOpenEditInfo(false);
+    setOpenFamily(false);
+    setOpenContacts(false);
+    setOpenAcademic(false);
+    setOpenPayments(false);
+    setOpenAddContract(false);
+  };
+
+  const activeOrRowFallback = (row) => {
+    // إذا activeStudent هو نفسه الطالب المطلوب استخدمه، وإلا استخدم row
+    if (activeStudent && String(activeStudent?.id) === String(row?.id)) {
+      return activeStudent;
+    }
+    // row غالباً ناقص، بس منرجّعه لحتى ما ينكسر UI
+    return row;
+  };
+
+  /* ================= Actions ================= */
+  const handleAdd = () => {
+    setIsAddOpen(true);
+  };
+
+  const handleDelete = (student) => {
+    setStudentToDelete(student);
+    setOpenDelete(true);
+  };
+
+  const confirmDelete = async (isPermanent = false) => {
+    if (!studentToDelete) return;
+
+    try {
+      await deleteStudent({
+        id: studentToDelete.id,
+        permanent: isPermanent,
+      }).unwrap();
+      notify.success(
+        isPermanent
+          ? "تم حذف الطالب وكامل بياناته وعائلته بنجاح"
+          : "تم حذف الطالب بنجاح",
+      );
+      setSelectedIds((prev) =>
+        prev.filter((id) => id !== String(studentToDelete.id)),
+      );
+      setOpenDelete(false);
+      setStudentToDelete(null);
+    } catch (e) {
+      notify.error(e?.data?.message || "فشل حذف الطالب");
+    }
+  };
+
+  /* ================= Menu callbacks ================= */
+  const onViewDetails = async (row) => {
+    closeAllModals();
+    setOpenDetails(true);
+    await ensureStudentDetails(row);
+  };
+
+  const onEditInfo = async (row) => {
+    closeAllModals();
+    setOpenEditInfo(true);
+    await ensureStudentDetails(row);
+  };
+
+  const onEditFamily = async (row) => {
+    closeAllModals();
+    setOpenFamily(true);
+    await ensureStudentDetails(row);
+  };
+
+  const onEditContacts = async (row) => {
+    closeAllModals();
+    setOpenContacts(true);
+    await ensureStudentDetails(row);
+  };
+
+  const onEditAcademic = async (row) => {
+    closeAllModals();
+
+    const student = await ensureStudentDetails(row);
+    if (!student) {
+      notify.error("فشل جلب بيانات الطالب");
+      return;
+    }
+
+    const record = student.academic_records?.[0];
+    setActiveAcademicRecordId(record?.id || null);
+    setOpenAcademic(true);
+  };
+
+  const onEditPayments = async (row) => {
+    closeAllModals();
+    setOpenPayments(true);
+    await ensureStudentDetails(row);
+  };
+
+  /* ================= Render ================= */
+  const tableHeaders = [
+    "#",
+    "الاسم",
+    "الكنية",
+    "اسم الأب",
+    "اسم الأم",
+    "الجنس",
+    "فرع المعهد",
+    "الشعبة",
+    "الإجراءات",
+  ];
+
+  return loadingStudents ? (
+    <PageSkeleton tableHeaders={tableHeaders} />
+  ) : (
+    <div dir="rtl" className="p-6 space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-center">
+        <div>
+          <h1 className="text-lg font-semibold">قائمة الطلاب</h1>
+          <Breadcrumb />
+        </div>
+        <div>
+          {/* LEFT SIDE — Filter + Print + Excel */}
+          <div className="flex flex-col items-end gap-3">
+            <div className="w-[240px]">
+              <SearchableSelect
+                label="الشعبة"
+                value={selectedBatchId}
+                onChange={setSelectedBatchId}
+                placeholder="كل الشعب"
+                options={[
+                  { key: "all", value: "", label: "كل الشعب" },
+                  ...batchOptions,
+                ]}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <PrintExportActions
+                data={filteredStudents}
+                selectedIds={selectedIds}
+                columns={[
+                  {
+                    header: "الاسم الكامل",
+                    key: "full_name",
+                    render: (_, row) =>
+                      row.full_name ?? `${row.first_name} ${row.last_name}`,
+                  },
+                  { header: "الجنس", key: "gender" },
+                  {
+                    header: "فرع المعهد",
+                    key: "institute_branch",
+                    render: (val) => val?.name ?? "-",
+                  },
+                  {
+                    header: "الشعبة",
+                    key: "batch",
+                    render: (val) => val?.name ?? "-",
+                  },
+                  { header: "تاريخ الولادة", key: "date_of_birth" },
+                ]}
+                title="قائمة الطلاب"
+                filename="الطلاب"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* FILTER + ACTIONS */}
+      <div className="flex justify-between items-start gap-4 flex-wrap">
+        {/* RIGHT SIDE — Actions */}
+        <div className="flex items-center gap-3">
+          <ActionsRow
+            showSelectAll
+            viewLabel=""
+            isAllSelected={isAllSelected}
+            onToggleSelectAll={() =>
+              setSelectedIds(
+                isAllSelected ? [] : filteredStudents.map((s) => String(s.id)),
+              )
+            }
+            addLabel="إضافة طالب"
+            onAdd={handleAdd}
+          />
+        </div>
+      </div>
+
+      {/* TABLE */}
+      <StudentsTable
+        students={filteredStudents}
+        isLoading={loadingStudents}
+        selectedIds={selectedIds}
+        onSelectChange={setSelectedIds}
+        onViewDetails={onViewDetails}
+        onEditStudentInfo={onEditInfo}
+        onEditFamily={onEditFamily}
+        onEditAcademic={onEditAcademic}
+        onEditContacts={onEditContacts}
+        onAddToBatch={onAddToBatch}
+        onAddContract={onAddContract}
+        onDeleteStudent={handleDelete}
+      />
+
+      {/* ============ DETAILS MODAL ============ */}
+      <StudentDetailsModal
+        open={openDetails}
+        onClose={() => setOpenDetails(false)}
+        student={activeStudentId ? activeStudent : null}
+        loading={loadingOne}
+      />
+
+      {/* ============ EDIT INFO (2 steps only) ============ */}
+      <EditStudentInfoModal
+        isOpen={openEditInfo}
+        onClose={() => setOpenEditInfo(false)}
+        student={activeStudentId ? activeStudent : null}
+      />
+
+      {/* ============ FAMILY ============ */}
+      <EditFamilyModal
+        open={openFamily}
+        onClose={() => setOpenFamily(false)}
+        student={activeStudentId ? activeStudent : null}
+        onSaved={async () => {
+          if (!activeStudentId) return;
+
+          try {
+            const res = await fetchStudentDetails(activeStudentId).unwrap();
+            const details = normalizeStudentDetailsResponse(res);
+
+            if (details) {
+              setActiveStudent(details);
+            }
+
+            await refetchStudents(); // ✅ تحديث الجدول مباشرة بدون رفرش
+          } catch (e) {
+            notify.error("فشل تحديث بيانات الجدول");
+          }
+        }}
+      />
+
+      {/* ============ CONTACTS ============ */}
+      <EditContactsModal
+        open={openContacts}
+        onClose={() => setOpenContacts(false)}
+        student={activeOrRowFallback({ id: activeStudentId })}
+        onSaved={() => {
+          if (activeStudentId) fetchStudentDetails(activeStudentId);
+        }}
+      />
+
+      {/* ============ ACADEMIC ============ */}
+      <EditAcademicModal
+        open={openAcademic}
+        recordId={activeAcademicRecordId}
+        studentId={activeStudentId}
+        onClose={() => setOpenAcademic(false)}
+        onSaved={async () => {
+          if (!activeStudentId) return;
+          const res = await fetchStudentDetails(activeStudentId).unwrap();
+          const details = normalizeStudentDetailsResponse(res);
+          if (details) setActiveStudent(details);
+        }}
+      />
+
+      {/* ============ PAYMENTS ============ */}
+
+      {/* DELETE MODAL */}
+      <StudentDeleteModal
+        isOpen={openDelete}
+        loading={deleting}
+        student={studentToDelete}
+        onClose={() => setOpenDelete(false)}
+        onConfirm={confirmDelete}
+      />
+
+      {/* ADD STUDENT MODAL (كما هو عندك) */}
+      <AddStudentModal
+        isOpen={isAddOpen}
+        onClose={() => {
+          setIsAddOpen(false);
+          router.replace(pathname); // يشيل كل query من الرابط
+        }}
+        student={null}
+        onAdded={async () => {
+          await refetchStudents();
+          setIsAddOpen(false);
+          router.replace(pathname); // يشيل ?add=1 بعد الإضافة
+        }}
+        onAssignToBatch={async (studentData) => {
+          setIsAddOpen(false);
+          router.replace(pathname);
+          await refetchStudents();
+          // نفتح مودال الإضافة للشعبة مباشرة
+          setOpenAddToBatch(true);
+          // نحتاج نضمن أن الطالب محمل
+          await ensureStudentDetails(studentData);
+        }}
+      />
+      <AddStudentToBatchModal
+        open={openAddToBatch}
+        onClose={() => setOpenAddToBatch(false)}
+        student={activeStudent}
+        onUpdated={async () => {
+          await refetchStudents();
+          if (activeStudentId) {
+            const res = await fetchStudentDetails(activeStudentId).unwrap();
+            setActiveStudent(res.data ?? res);
+          }
+        }}
+        batchOptions={batchOptions}
+        batchesLoading={batchesLoading}
+      />
+
+      <AddContractModal
+        open={openAddContract}
+        onClose={() => setOpenAddContract(false)}
+        student={activeStudent}
+        onSaved={async () => {
+          await refetchStudents();
+          if (activeStudentId) {
+            const res = await fetchStudentDetails(activeStudentId).unwrap();
+            setActiveStudent(res.data ?? res);
+          }
+        }}
+      />
+    </div>
+  );
+}

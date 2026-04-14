@@ -1,0 +1,360 @@
+{
+  "branches": [
+    {
+      "id": 1,
+      "name": "بكالوريا علمي",
+      "classes": [
+        {
+          "id": 1,
+          "name": "بكالوريا علمي - الشعبة أ",
+          "room_id": 1,
+          "allow_same_subject_same_day": false,
+          "subjects": [
+            {
+              "id": 101,
+              "name": "رياضيات",
+              "teacher_ids": [
+                1
+              ],
+              "lessons_per_week": 6,
+              "allow_same_subject_same_day": true
+            },
+            {
+              "id": 102,
+              "name": "فيزياء",
+              "teacher_ids": [
+                3
+              ],
+              "lessons_per_week": 4,
+              "allow_same_subject_same_day": false
+            },
+            {
+              "id": 103,
+              "name": "كيمياء",
+              "teacher_ids": [
+                5
+              ],
+              "lessons_per_week": 4,
+              "allow_same_subject_same_day": true
+            },
+            {
+              "id": 104,
+              "name": "أحياء",
+              "teacher_ids": [
+                7
+              ],
+              "lessons_per_week": 3
+            },
+            {
+              "id": 105,
+              "name": "لغة عربية",
+              "teacher_ids": [
+                9
+              ],
+              "lessons_per_week": 3
+            },
+            {
+              "id": 106,
+              "name": "لغة إنكليزية",
+              "teacher_ids": [
+                10
+              ],
+              "lessons_per_week": 2,
+              "allow_same_subject_same_day": true
+            },
+            {
+              "id": 110,
+              "name": "تربية دينية",
+              "teacher_ids": [
+                14
+              ],
+              "lessons_per_week": 1
+            },
+            {
+              "id": 111,
+              "name": "تكنولوجيا المعلومات",
+              "teacher_ids": [
+                15
+              ],
+              "lessons_per_week": 2,
+              "allow_same_subject_same_day": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "teachers": [
+    {
+      "id": 1,
+      "name": "د. أحمد محمد",
+      "priority_level": 1,
+      "preferences": {
+        "avoid_days": [
+          "thu"
+        ],
+        "preferred_slots": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "avoid_slots": [
+          5
+        ],
+        "blocked_slots": {
+          "thu": [
+            3
+          ]
+        }
+      }
+    },
+    {
+      "id": 2,
+      "name": "د. سامية علي",
+      "priority_level": 1,
+      "preferences": {
+        "preferred_days": [
+          "mon",
+          "wed",
+          "thu"
+        ],
+        "preferred_slots": [
+          3,
+          4
+        ],
+        "avoid_days": [
+          "sun"
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "name": "د. خالد حسن",
+      "priority_level": 1,
+      "preferences": {
+        "preferred_days": [
+          "sun",
+          "tue",
+          "thu"
+        ],
+        "preferred_slots": [
+          2,
+          3
+        ],
+        "avoid_slots": [
+          1
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "name": "د. ليلى عبد الله",
+      "priority_level": 2,
+      "preferences": {
+        "preferred_days": [
+          "sun",
+          "mon",
+          "tue",
+          "wed",
+          "thu"
+        ],
+        "preferred_slots": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "name": "د. عمر يوسف",
+      "priority_level": 1,
+      "preferences": {
+        "preferred_days": [
+          "sun",
+          "mon",
+          "wed"
+        ],
+        "preferred_slots": [
+          3,
+          4
+        ],
+        "avoid_days": [
+          "fri"
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "name": "د. نادية كامل",
+      "priority_level": 2,
+      "preferences": {
+        "preferred_days": [
+          "tue",
+          "thu"
+        ],
+        "preferred_slots": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "name": "د. وائل رجب",
+      "priority_level": 1,
+      "preferences": {
+        "preferred_days": [
+          "sun",
+          "tue",
+          "thu"
+        ],
+        "preferred_slots": [
+          1,
+          3
+        ],
+        "avoid_slots": [
+          5
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "name": "د. فاطمة الزهراء",
+      "priority_level": 2,
+      "preferences": {
+        "preferred_days": [
+          "mon",
+          "wed"
+        ],
+        "preferred_slots": [
+          2,
+          4
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "name": "أ. محمد فارس",
+      "priority_level": 2,
+      "preferences": {
+        "preferred_days": [
+          "sun",
+          "mon",
+          "tue",
+          "wed"
+        ],
+        "preferred_slots": [
+          1,
+          2
+        ],
+        "avoid_days": [
+          "thu"
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "name": "أ. سارة جميل",
+      "priority_level": 2,
+      "preferences": {
+        "preferred_days": [
+          "mon",
+          "tue",
+          "wed",
+          "thu"
+        ],
+        "preferred_slots": [
+          3,
+          4
+        ],
+        "avoid_days": [
+          "sun"
+        ]
+      }
+    },
+    {
+      "id": 14,
+      "name": "أ. محمد الدين",
+      "priority_level": 3,
+      "preferences": {
+        "preferred_days": [
+          "mon",
+          "wed"
+        ],
+        "preferred_slots": [
+          5
+        ],
+        "avoid_days": [
+          "tue",
+          "thu"
+        ]
+      }
+    },
+    {
+      "id": 15,
+      "name": "أ. ياسر القحطاني",
+      "priority_level": 2,
+      "preferences": {
+        "preferred_slots": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "avoid_slots": [
+          5
+        ]
+      }
+    }
+  ],
+  "teacher_priority_levels": {
+    "1": {
+      "name": "دكتوراه/خبير",
+      "weight_multiplier": 1.5
+    },
+    "2": {
+      "name": "ماجستير/متوسط",
+      "weight_multiplier": 1.0
+    },
+    "3": {
+      "name": "بكالوريوس/مبتدئ",
+      "weight_multiplier": 0.7
+    }
+  },
+  "rooms": [
+    {
+      "id": 1,
+      "name": "قاعة 101 (بكالوريا علمي)"
+    }
+  ],
+  "slots": [
+    {
+      "id": 1,
+      "label": "07:30-09:00"
+    },
+    {
+      "id": 2,
+      "label": "09:00-10:30"
+    },
+    {
+      "id": 3,
+      "label": "10:30-12:00"
+    },
+    {
+      "id": 4,
+      "label": "12:30-14:00"
+    },
+    {
+      "id": 5,
+      "label": "14:00-15:30"
+    }
+  ],
+  "days": [
+    "sun",
+    "mon",
+    "tue",
+    "wed",
+    "thu"
+  ]
+}

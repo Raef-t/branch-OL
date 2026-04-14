@@ -1,0 +1,11 @@
+{
+    "name": "ModificationRequests",
+    "alias": "modificationrequests",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\ModificationRequests\\Providers\\ModificationRequestsServiceProvider"
+    ],
+    "files": []
+}

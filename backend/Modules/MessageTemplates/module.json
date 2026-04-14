@@ -1,0 +1,11 @@
+{
+    "name": "MessageTemplates",
+    "alias": "messagetemplates",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\MessageTemplates\\Providers\\MessageTemplatesServiceProvider"
+    ],
+    "files": []
+}

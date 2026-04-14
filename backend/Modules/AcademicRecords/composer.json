@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/academicrecords",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\AcademicRecords\\": "app/",
+            "Modules\\AcademicRecords\\Database\\Factories\\": "database/factories/",
+            "Modules\\AcademicRecords\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\AcademicRecords\\Tests\\": "tests/"
+        }
+    }
+}

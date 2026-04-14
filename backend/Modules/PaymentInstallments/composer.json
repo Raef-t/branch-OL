@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/paymentinstallments",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\PaymentInstallments\\": "app/",
+            "Modules\\PaymentInstallments\\Database\\Factories\\": "database/factories/",
+            "Modules\\PaymentInstallments\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\PaymentInstallments\\Tests\\": "tests/"
+        }
+    }
+}

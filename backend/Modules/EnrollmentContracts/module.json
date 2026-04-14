@@ -1,0 +1,11 @@
+{
+    "name": "EnrollmentContracts",
+    "alias": "enrollmentcontracts",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\EnrollmentContracts\\Providers\\EnrollmentContractsServiceProvider"
+    ],
+    "files": []
+}

@@ -1,0 +1,11 @@
+{
+    "name": "StudentExits",
+    "alias": "studentexits",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\StudentExits\\Providers\\StudentExitsServiceProvider"
+    ],
+    "files": []
+}

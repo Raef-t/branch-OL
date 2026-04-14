@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/batches",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Batches\\": "app/",
+            "Modules\\Batches\\Database\\Factories\\": "database/factories/",
+            "Modules\\Batches\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Batches\\Tests\\": "tests/"
+        }
+    }
+}

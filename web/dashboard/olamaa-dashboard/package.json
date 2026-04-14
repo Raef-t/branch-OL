@@ -1,0 +1,45 @@
+{
+  "name": "olamaa-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "NODE_OPTIONS=--max-old-space-size=8192 next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@hookform/resolvers": "^5.2.2",
+    "@reduxjs/toolkit": "^2.9.0",
+    "@zxing/browser": "^0.1.5",
+    "apexcharts": "^5.3.5",
+    "awesome-phonenumber": "^7.5.0",
+    "axios": "^1.12.2",
+    "country-calling-code": "^0.0.3",
+    "date-fns": "^4.1.0",
+    "dayjs": "^1.11.19",
+    "file-saver": "^2.0.5",
+    "google-libphonenumber": "^3.2.43",
+    "html5-qrcode": "^2.3.8",
+    "libphonenumber-js": "^1.12.18",
+    "lucide-react": "^0.545.0",
+    "next": "^16.1.6",
+    "react": "^19.2.4",
+    "react-apexcharts": "^1.8.0",
+    "react-calendar": "^6.0.0",
+    "react-dom": "^19.2.4",
+    "react-hook-form": "^7.63.0",
+    "react-hot-toast": "^2.6.0",
+    "react-redux": "^9.2.0",
+    "react-to-print": "^3.2.0",
+    "recharts": "^3.3.0",
+    "xlsx": "^0.18.5",
+    "yup": "^1.7.1",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "tailwindcss": "^4"
+  }
+}

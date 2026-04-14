@@ -1,0 +1,11 @@
+{
+    "name": "AcademicRecords",
+    "alias": "academicrecords",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\AcademicRecords\\Providers\\AcademicRecordsServiceProvider"
+    ],
+    "files": []
+}

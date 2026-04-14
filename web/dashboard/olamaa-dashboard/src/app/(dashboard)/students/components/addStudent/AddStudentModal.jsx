@@ -1,0 +1,743 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { X } from "lucide-react";
+
+import { useForm } from "react-hook-form";
+import { skipToken } from "@reduxjs/toolkit/query";
+
+import Stepper from "@/components/common/Stepper";
+import FamilyCheckModal from "../FamilyCheckModal";
+import { notify } from "@/lib/helpers/toastify";
+import Step1Student from "./steps/Step1Student";
+import Step2StudentExtra from "./steps/Step2StudentExtra";
+import Step3Parents from "./steps/Step3Parents";
+import Step4Record from "./steps/Step4Record";
+import Step5Contacts from "./steps/Step5Contacts";
+import Step6EnrollmentContract from "./steps/Step6EnrollmentContract";
+import StepSuccess from "./steps/StepSuccess";
+
+import useAddEnrollment from "../../hooks/useAddEnrollment";
+
+import {
+  useGetRecordsQuery,
+  useAddRecordMutation,
+  useUpdateRecordMutation,
+} from "@/store/services/academicRecordsApi";
+
+import {
+  useGetContactsQuery,
+  useAddContactMutation,
+  useUpdateContactMutation,
+  useDeleteContactMutation,
+} from "@/store/services/contactsApi";
+
+/* ================= helpers ================= */
+const clean = (v) => {
+  const s = String(v ?? "")
+    .trim()
+    .replace(/\s+/g, " ");
+  return s === "" ? null : s;
+};
+
+export default function AddStudentModal({
+  isOpen,
+  onClose,
+  student,
+  onAdded,
+  onAssignToBatch,
+}) {
+  /* ================= meta ================= */
+  const total = 7; //8
+  const isEdit = !!student;
+  const [loadingStep3, setLoadingStep3] = useState(false);
+  const [loadingStep4, setLoadingStep4] = useState(false);
+  const [loadingStep5, setLoadingStep5] = useState(false);
+
+  /* ================= state ================= */
+  const [step, setStep] = useState(1);
+  const [studentId, setStudentId] = useState(student?.id ?? null);
+  const [familyId, setFamilyId] = useState(student?.family_id ?? null);
+  const [guardians, setGuardians] = useState([]);
+  const [academicRecordId, setAcademicRecordId] = useState(null);
+  const [existingContacts, setExistingContacts] = useState([]);
+  const [enrollmentContractId, setEnrollmentContractId] = useState(null);
+  const [createdStudent, setCreatedStudent] = useState(null);
+
+  const [showFamilyCheck, setShowFamilyCheck] = useState(false);
+  const [familyCandidate, setFamilyCandidate] = useState(null);
+  const [familyCandidates, setFamilyCandidates] = useState([]);
+  const [matchCount, setMatchCount] = useState(0);
+  const [matchReason, setMatchReason] = useState("name");
+  const [pendingEnrollment, setPendingEnrollment] = useState(null);
+  const [showConfirmSummary, setShowConfirmSummary] = useState(false);
+
+  /* ✅ connection state (اختياري يفيدك للـ UI) */
+  const [isOnline, setIsOnline] = useState(true);
+
+  /* ================= APIs ================= */
+  const { handleAddEnrollment } = useAddEnrollment();
+
+  const { data: recordsRes } = useGetRecordsQuery(
+    studentId ? { student_id: studentId } : skipToken,
+  );
+
+  const { data: contactsRes } = useGetContactsQuery(
+    isEdit && studentId ? { student_id: studentId } : skipToken,
+  );
+
+  const [addRecord] = useAddRecordMutation();
+  const [updateRecord] = useUpdateRecordMutation();
+  const [addContact] = useAddContactMutation();
+  const [updateContact] = useUpdateContactMutation();
+  const [deleteContact] = useDeleteContactMutation();
+  const [lockBackFromStep4, setLockBackFromStep4] = useState(false);
+
+  /* ================= Forms ================= */
+  const form1 = useForm({ mode: "onTouched" });
+  const form2 = useForm({ mode: "onTouched" });
+  const form3 = useForm({ mode: "onTouched" });
+  const form4 = useForm({ mode: "onTouched" });
+
+  const pickFirstError = (errorsObj) => {
+    const any = Object.values(errorsObj || {}).find((e) => e?.message);
+    return any?.message || "تحقق من البيانات";
+  };
+
+  /* ================= ✅ Internet check ================= */
+  const ensureOnline = useCallback(async () => {
+    // 1) فحص سريع من المتصفح
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      return false;
+    }
+
+    // 2) فحص فعلي خفيف (اختياري لكنه أدق)
+    // ملاحظة: لو عندك Endpoint health check بسيرفرك استبدله هون.
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 3500);
+
+      // نضرب طلب صغير (HEAD) على نفس الدومين
+      // إذا السيرفر Down رح يفشل، وهيك بتعتبره "ما في اتصال مفيد للتسجيل"
+      const response = await fetch("/", {
+        method: "HEAD",
+        cache: "no-store",
+        signal: ctrl.signal,
+      });
+
+      clearTimeout(t);
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // تحديث isOnline تلقائيًا (للـ UI/تعطيل زر مثلًا)
+  useEffect(() => {
+    const update = () =>
+      setIsOnline(typeof navigator === "undefined" ? true : navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+
+  /* ================= Reset ================= */
+  const resetAll = () => {
+    setStep(1);
+    setStudentId(null);
+    setFamilyId(null);
+    setGuardians([]);
+    setAcademicRecordId(null);
+    setExistingContacts([]);
+    setEnrollmentContractId(null);
+    setShowFamilyCheck(false);
+    setFamilyCandidate(null);
+    setFamilyCandidates([]);
+    setMatchCount(0);
+    setMatchReason("name");
+    setPendingEnrollment(null);
+    setShowConfirmSummary(false);
+    setLockBackFromStep4(false);
+    setCreatedStudent(null);
+
+    form1.reset();
+    form2.reset();
+    form3.reset();
+    form4.reset();
+  };
+
+  useEffect(() => {
+    if (!isOpen) resetAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  /* ================= Edit Fill ================= */
+  useEffect(() => {
+    if (!student) return;
+
+    form1.reset({
+      first_name: student.first_name,
+      last_name: student.last_name,
+      birth_place: student.birth_place,
+      date_of_birth: student.date_of_birth,
+      national_id: student.national_id,
+      gender: student.gender,
+      branch_id: student.branch_id,
+      institute_branch_id: student.institute_branch_id,
+    });
+
+    form2.reset({
+      enrollment_date: student.enrollment_date,
+      start_attendance_date: student.start_attendance_date,
+      school_id: student.school_id, // ✅ أضفه
+      how_know_institute: student.how_know_institute,
+      city_id: student.city_id,
+      status_id: student.status_id,
+      bus_id: student.bus_id,
+      health_status: student.health_status,
+      psychological_status: student.psychological_status,
+      notes: student.notes,
+    });
+
+    setStudentId(student.id);
+    setFamilyId(student.family_id);
+    setStep(1);
+  }, [student]);
+
+  /* ================= Academic Record ================= */
+  useEffect(() => {
+    // إزالة قيد isEdit للسماح بالتحميل عند العودة للخطوة للطالب الجديد
+    if (!studentId) return;
+
+    const record = recordsRes?.data?.[0];
+    if (!record) return;
+
+    form4.reset({
+      record_type: record.record_type,
+      total_score: record.total_score,
+      year: record.year,
+      description: record.description,
+    });
+
+    setAcademicRecordId(record.id);
+  }, [recordsRes, studentId]);
+
+  /* ================= Contacts ================= */
+  useEffect(() => {
+    if (studentId && contactsRes?.data) {
+      setExistingContacts(contactsRes.data);
+    }
+  }, [contactsRes, studentId]);
+
+  if (!isOpen) return null;
+
+  const handleClose = () => {
+    resetAll();
+    onClose();
+  };
+
+  /* ================= Steps Logic ================= */
+
+  const handleStep1 = async () => {
+    const ok = await form1.trigger([
+      "first_name",
+      "last_name",
+      "date_of_birth",
+      "national_id",
+      "branch_id",
+      "institute_branch_id",
+    ]);
+
+    if (!ok) {
+      notify.error(pickFirstError(form1.formState.errors), "تحقق من البيانات");
+      return;
+    }
+
+    setStep(2);
+  };
+
+  const handleStep2 = async () => {
+    const ok = await form2.trigger([
+      "enrollment_date",
+      "start_attendance_date",
+      "gender",
+    ]);
+
+    if (!ok) {
+      notify.error(pickFirstError(form2.formState.errors), "تحقق من البيانات");
+      return;
+    }
+
+    setStep(3);
+  };
+
+  const handleStep3 = async () => {
+    const ok = await form3.trigger();
+    if (!ok) {
+      notify.error(pickFirstError(form3.formState.errors), "تحقق من البيانات");
+      return;
+    }
+
+    // بالتعديل ما في API هون (حسب كودك)
+    if (isEdit) {
+      setStep(4);
+      return;
+    }
+
+    // ✅ قبل الـ API: افحص الإنترنت
+    const online = await ensureOnline();
+    if (!online) {
+      notify.error(
+        "لا يوجد  اتصال إنترنت. رجاءً تأكد من الشبكة وحاول مرة ثانية.",
+        "لا يوجد إنترنت",
+      );
+      return;
+    }
+
+    const studentData = { ...form1.getValues(), ...form2.getValues() };
+    const p = form3.getValues();
+
+    const payload = {
+      student: {
+        ...studentData,
+        first_name: clean(studentData.first_name),
+        last_name: clean(studentData.last_name),
+        school_id: studentData.school_id || null, // ✅ أضفه هنا
+      },
+      father: {
+        first_name: clean(p.father_first_name),
+        last_name: clean(p.father_last_name),
+        national_id: clean(p.father_national_id),
+        // phone: clean(p.father_phone),
+      },
+      mother: {
+        first_name: clean(p.mother_first_name),
+        last_name: clean(p.mother_last_name),
+        national_id: clean(p.mother_national_id),
+        // phone: clean(p.mother_phone),
+      },
+    };
+
+    setPendingEnrollment(payload);
+    setShowConfirmSummary(true);
+  };
+
+  const confirmAndSubmitStep3 = async () => {
+    setShowConfirmSummary(false);
+    setLoadingStep3(true);
+    try {
+      const res = await handleAddEnrollment(pendingEnrollment);
+
+      // ─── فحص وجود عائلات متطابقة (بالأسماء أو الهاتف) ──────
+      if (res?.data?.match_count > 0) {
+        setMatchCount(res.data.match_count);
+        setMatchReason(res.data.match_reason || (res.data.families?.[0]?.match_reason) || "name");
+        
+        if (res.data.match_count === 1) {
+          setFamilyCandidate(res.data.family || null);
+          setFamilyCandidates([]);
+        } else {
+          setFamilyCandidate(null);
+          setFamilyCandidates(res.data.families || []);
+        }
+        
+        setShowFamilyCheck(true);
+        return;
+      }
+
+      setStudentId(res.data.id);
+      setCreatedStudent(res.data);
+      setFamilyId(res.data.family_id);
+      setGuardians(res.data.guardians || []);
+      setExistingContacts(res.data.contact_details || []);
+      setLockBackFromStep4(true);
+      notify.success("تم حفظ بيانات الطالب والعائلة بنجاح");
+      setStep(4);
+    } catch (e) {
+      // ✅ إذا قطع الإنترنت أثناء الطلب أو فشل الشبكة
+      const onlineNow = await ensureOnline();
+      if (!onlineNow) {
+        notify.error(
+          "انقطع الاتصال أثناء الحفظ. تأكد من الإنترنت وحاول مرة ثانية.",
+          "مشكلة اتصال",
+        );
+      } else {
+        notify.error(
+          e.data?.message || "فشل حفظ بيانات الطالب والعائلة",
+          "خطأ",
+        );
+      }
+    } finally {
+      setLoadingStep3(false);
+    }
+  };
+
+  const confirmAttachFamily = async (selectedId) => {
+    // إذا كان المودال يعرض عائلة واحدة فقط ولم يمرر ID، نستخدم الكانديديت الوحيد
+    const targetId = selectedId || familyCandidate?.id;
+
+    if (!targetId) {
+      notify.error("يرجى اختيار العائلة للربط");
+      return;
+    }
+
+    setShowFamilyCheck(false);
+
+    // ✅ قبل الـ API: افحص الإنترنت
+    const online = await ensureOnline();
+    if (!online) {
+      notify.error(
+        "لا يوجد اتصال إنترنت. رجاءً تأكد من الشبكة وحاول مرة ثانية.",
+        "لا يوجد إنترنت",
+      );
+      return;
+    }
+
+    setLoadingStep3(true);
+    try {
+      const res = await handleAddEnrollment({
+        ...pendingEnrollment,
+        is_existing_family_confirmed: true,
+        confirmed_family_id: targetId,
+      });
+
+      setStudentId(res.data.id);
+      setCreatedStudent(res.data);
+      setFamilyId(res.data.family_id);
+      setGuardians(res.data.guardians || []);
+      setExistingContacts(res.data.contact_details || []);
+      setLockBackFromStep4(true);
+      setStep(4);
+    } catch (e) {
+      const onlineNow = await ensureOnline();
+      if (!onlineNow) {
+        notify.error(
+          "انقطع الاتصال أثناء الربط. تأكد من الإنترنت وحاول مرة ثانية.",
+          "مشكلة اتصال",
+        );
+      } else {
+        notify.error("فشل ربط العائلة", "خطأ");
+      }
+    } finally {
+      setLoadingStep3(false);
+    }
+  };
+
+  const confirmNewFamily = async () => {
+    setShowFamilyCheck(false);
+
+    // ✅ قبل الـ API: افحص الإنترنت
+    const online = await ensureOnline();
+    if (!online) {
+      notify.error(
+        "لا يوجد اتصال إنترنت. رجاءً تأكد من الشبكة وحاول مرة ثانية.",
+        "لا يوجد إنترنت",
+      );
+      return;
+    }
+
+    setLoadingStep3(true);
+    try {
+      const res = await handleAddEnrollment({
+        ...pendingEnrollment,
+        __sendFamilyDecision: true,
+        is_existing_family_confirmed: false,
+      });
+
+      setStudentId(res.data.id);
+      setCreatedStudent(res.data);
+      setFamilyId(res.data.family_id);
+      setGuardians(res.data.guardians || []);
+      setExistingContacts(res.data.contact_details || []);
+      setLockBackFromStep4(true);
+      setStep(4);
+    } catch (e) {
+      const onlineNow = await ensureOnline();
+      if (!onlineNow) {
+        notify.error(
+          "انقطع الاتصال أثناء الإنشاء. تأكد من الإنترنت وحاول مرة ثانية.",
+          "مشكلة اتصال",
+        );
+      } else {
+        notify.error("فشل إنشاء عائلة جديدة", "خطأ");
+      }
+    } finally {
+      setLoadingStep3(false);
+    }
+  };
+
+  const handleStep4 = async () => {
+    const ok = await form4.trigger([
+      "record_type",
+      "total_score",
+      "year",
+      "description",
+    ]);
+    if (!ok) {
+      notify.error(pickFirstError(form4.formState.errors), "تحقق من البيانات");
+      return;
+    }
+
+    setLoadingStep4(true);
+    try {
+      const payload = {
+        student_id: studentId,
+        ...form4.getValues(),
+      };
+
+      if (academicRecordId) {
+        await updateRecord({ id: academicRecordId, ...payload }).unwrap();
+      } else {
+        const res = await addRecord(payload).unwrap();
+        if (res?.data?.id) setAcademicRecordId(res.data.id);
+      }
+
+      setStep(5);
+    } catch (e) {
+      notify.error("فشل حفظ السجل الأكاديمي", "خطأ");
+    } finally {
+      setLoadingStep4(false);
+    }
+  };
+
+  const handleSaveContacts = async (contactsPayload) => {
+    setLoadingStep5(true);
+    try {
+      const payloadIds = new Set(contactsPayload.map((c) => c.id).filter(Boolean));
+      const toDelete = existingContacts.filter((c) => !payloadIds.has(c.id));
+      const toUpdate = contactsPayload.filter((c) => !!c.id);
+      const toAdd = contactsPayload.filter((c) => !c.id);
+
+      await Promise.all(toDelete.map((c) => deleteContact(c.id).unwrap()));
+      await Promise.all(toUpdate.map((it) => updateContact({ id: it.id, ...it }).unwrap()));
+      await Promise.all(toAdd.map((it) => addContact(it).unwrap()));
+
+      setStep(6);
+    } catch (e) {
+      notify.error("فشل حفظ جهات التواصل", "خطأ");
+    } finally {
+      setLoadingStep5(false);
+    }
+  };
+
+  /* ================= render ================= */
+  return (
+    <>
+      {showConfirmSummary && pendingEnrollment && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="bg-[#6F013F] text-white px-5 py-4 font-bold flex justify-between items-center">
+              <span>تأكيد بيانات الطالب والعائلة</span>
+              <button
+                onClick={() => setShowConfirmSummary(false)}
+                className="text-white hover:text-gray-200 transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-gray-600 mb-2 leading-relaxed">
+                يرجى مراجعة البيانات التالية بدقة.{" "}
+                <strong className="text-red-500 font-semibold">تنبيه:</strong>{" "}
+                بمجرد الحفظ، لن تتمكن من العودة لتعديل هذه البيانات من خلال هذه
+                النافذة.
+              </p>
+
+              <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 text-sm space-y-3">
+                <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                  <span className="text-gray-500">اسم الطالب:</span>
+                  <span className="font-semibold text-gray-800">
+                    {pendingEnrollment.student.first_name}{" "}
+                    {pendingEnrollment.student.last_name}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                  <span className="text-gray-500">اسم الأب:</span>
+                  <span className="font-semibold text-gray-800">
+                    {pendingEnrollment.father.first_name}{" "}
+                    {pendingEnrollment.father.last_name}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">اسم الأم:</span>
+                  <span className="font-semibold text-gray-800">
+                    {pendingEnrollment.mother.first_name}{" "}
+                    {pendingEnrollment.mother.last_name}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 justify-end pt-3">
+                <button
+                  onClick={() => setShowConfirmSummary(false)}
+                  className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 text-sm transition"
+                  disabled={loadingStep3}
+                >
+                  تراجع للتعديل
+                </button>
+                <button
+                  onClick={confirmAndSubmitStep3}
+                  className="px-4 py-2 bg-[#6F013F] text-white rounded-lg hover:bg-[#5a0031] shadow text-sm font-medium transition flex items-center justify-center min-w-[120px]"
+                  disabled={loadingStep3}
+                >
+                  {loadingStep3 ? "جاري الحفظ..." : "تأكيد وحفظ"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFamilyCheck && (
+        <FamilyCheckModal
+          family={familyCandidate}
+          families={familyCandidates}
+          matchCount={matchCount}
+          matchReason={matchReason}
+          onConfirmAttach={confirmAttachFamily}
+          onConfirmNew={confirmNewFamily}
+          onClose={() => setShowFamilyCheck(false)}
+        />
+      )}
+
+      <div className="fixed inset-0 bg-black/40 z-50 flex">
+        {/* ✅ Panel بدون scroll */}
+        <div className="w-full max-w-[520px] bg-white h-full flex flex-col">
+          {/* ✅ Header ثابت */}
+          <div className="shrink-0 p-6 pb-4 border-b border-gray-100 bg-white/90 backdrop-blur">
+            <div className="flex justify-between items-start">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-[#6F013F] font-semibold">
+                  {isEdit ? "تعديل طالب" : "إضافة طالب"}
+                </h2>
+                <span className="text-xs text-gray-500">
+                  {isOnline ? "متصل" : "غير متصل"}
+                </span>
+              </div>
+
+              <button
+                onClick={handleClose}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                <X />
+              </button>
+            </div>
+          </div>
+
+          {/* ✅ Stepper ثابت */}
+          <div className="shrink-0 px-6 py-4 border-b border-gray-100 bg-white">
+            <Stepper current={step} total={total} />
+          </div>
+
+          {/* ✅ محتوى الخطوة: ياخد باقي الارتفاع */}
+          <div className="flex-1 min-h-0 px-6 py-4 overflow-hidden">
+            {/* مهم: نعطي h-full حتى Step1Student يشتغل تثبيتو */}
+            <div className="h-full">
+              {step === 1 && (
+                <Step1Student
+                  control={form1.control}
+                  register={form1.register}
+                  errors={form1.formState.errors}
+                  watch={form1.watch}
+                  setValue={form1.setValue}
+                  isEdit={isEdit}
+                  onNext={handleStep1}
+                  onBack={handleClose}
+                />
+              )}
+
+              {step === 2 && (
+                <Step2StudentExtra
+                  control={form2.control}
+                  register={form2.register}
+                  errors={form2.formState.errors}
+                  watch={form2.watch}
+                  setValue={form2.setValue}
+                  trigger={form2.trigger}
+                  isEdit={isEdit}
+                  onNext={handleStep2}
+                  onBack={() => setStep(1)}
+                />
+              )}
+
+              {step === 3 && (
+                <Step3Parents
+                  register={form3.register}
+                  errors={form3.formState.errors}
+                  setValue={form3.setValue}
+                  watch={form3.watch}
+                  isEdit={isEdit}
+                  studentLastName={form1.watch("last_name")}
+                  onNext={handleStep3}
+                  onBack={() => setStep(2)}
+                  loading={loadingStep3}
+                />
+              )}
+
+              {step === 4 && (
+                <Step4Record
+                  control={form4.control}
+                  register={form4.register}
+                  errors={form4.formState.errors}
+                  watch={form4.watch}
+                  setValue={form4.setValue}
+                  isEdit={isEdit}
+                  onNext={handleStep4}
+                  onBack={() => {
+                    if (lockBackFromStep4) return;
+                    setStep(3);
+                  }}
+                  onSkip={() => setStep(5)}
+                  loading={loadingStep4}
+                  backDisabled={lockBackFromStep4}
+                />
+              )}
+
+              {step === 5 && (
+                <Step5Contacts
+                  studentId={studentId}
+                  familyId={familyId}
+                  guardians={guardians}
+                  existingContacts={existingContacts}
+                  onSaveAll={handleSaveContacts}
+                  onBack={() => setStep(4)}
+                  loading={loadingStep5}
+                />
+              )}
+
+              {step === 6 && (
+                <Step6EnrollmentContract
+                  studentId={studentId}
+                  instituteBranchId={form1.getValues("institute_branch_id")}
+                  onBack={() => setStep(5)}
+                  onNext={(id) => {
+                    setEnrollmentContractId(id);
+                    setStep(7);
+                  }}
+                  onSkip={() => setStep(7)}
+                />
+              )}
+
+              {step === 7 && (
+                <StepSuccess
+                  studentId={studentId}
+                  student={createdStudent || student}
+                  onAssignToBatch={onAssignToBatch}
+                  onReset={() => {
+                    resetAll();
+                    onAdded?.();
+                  }}
+                  onClose={handleClose}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

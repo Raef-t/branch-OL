@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/knowledgesources",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\KnowledgeSources\\": "app/",
+            "Modules\\KnowledgeSources\\Database\\Factories\\": "database/factories/",
+            "Modules\\KnowledgeSources\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\KnowledgeSources\\Tests\\": "tests/"
+        }
+    }
+}

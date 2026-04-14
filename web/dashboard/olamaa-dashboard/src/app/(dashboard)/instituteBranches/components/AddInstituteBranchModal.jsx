@@ -1,0 +1,184 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { X } from "lucide-react";
+import toast from "react-hot-toast";
+
+import FormInput from "@/components/common/InputField";
+import SelectInput from "@/components/common/SelectInput";
+import StepButtonsSmart from "@/components/common/StepButtonsSmart";
+import PhoneInput from "@/components/common/PhoneInput";
+
+import {
+  useAddInstituteBranchMutation,
+  useUpdateInstituteBranchMutation,
+} from "@/store/services/instituteBranchesApi";
+
+export default function AddInstituteBranchModal({
+  isOpen,
+  onClose,
+  branch, // null = add | object = edit
+}) {
+  const [addBranch] = useAddInstituteBranchMutation();
+  const [updateBranch] = useUpdateInstituteBranchMutation();
+
+  // ===== Form =====
+  const initialForm = {
+    name: "",
+    code: "",
+    address: "",
+    phone: "",
+    email: "",
+    manager_name: "",
+    is_active: "true",
+  };
+
+  const [form, setForm] = useState(initialForm);
+  const [loading, setLoading] = useState(false);
+
+  // stepper (خطوة واحدة)
+  const step = 1;
+  const total = 1;
+
+  // ===== Fill form on edit =====
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (branch) {
+      setForm({
+        name: branch.name ?? "",
+        code: branch.code ?? "",
+        address: branch.address ?? "",
+        phone: branch.phone ?? "",
+        email: branch.email ?? "",
+        manager_name: branch.manager_name ?? "",
+        is_active: branch.is_active ? "true" : "false",
+      });
+    } else {
+      setForm(initialForm);
+    }
+  }, [isOpen, branch]);
+
+  // ===== Submit =====
+  const handleSubmit = async () => {
+    if (!form.name.trim()) return toast.error("اسم الفرع مطلوب");
+    if (!form.code.trim()) return toast.error("كود الفرع مطلوب");
+    if (!form.address.trim()) return toast.error("العنوان مطلوب");
+
+    try {
+      setLoading(true);
+
+      const payload = {
+        name: form.name.trim(),
+        code: form.code.trim(),
+        address: form.address.trim(),
+        phone: form.phone?.replace("+", "") || null,
+        email: form.email?.trim() || null,
+        manager_name: form.manager_name?.trim() || null,
+        is_active: form.is_active === "true" ? 1 : 0,
+      };
+
+      if (branch) {
+        await updateBranch({ id: branch.id, ...payload }).unwrap();
+        toast.success("تم تعديل الفرع بنجاح");
+      } else {
+        await addBranch(payload).unwrap();
+        toast.success("تم إضافة الفرع بنجاح");
+      }
+
+      onClose();
+    } catch (err) {
+      const errors = err?.data?.errors;
+      if (errors) {
+        const firstKey = Object.keys(errors)[0];
+        const firstMsg = errors[firstKey]?.[0];
+        if (firstMsg) return toast.error(firstMsg);
+      }
+      toast.error(err?.data?.message || "حدث خطأ أثناء الحفظ");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-start">
+      <div className="w-full sm:w-[520px] bg-white h-full shadow-xl p-6 overflow-y-auto">
+        {/* ================= HEADER ================= */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-[#6F013F] font-semibold">
+            {branch ? "تعديل فرع" : "إضافة فرع جديد"}
+          </h2>
+          <button onClick={onClose}>
+            <X className="w-5 h-5 text-gray-500 hover:text-gray-700" />
+          </button>
+        </div>
+
+        {/* ================= FORM ================= */}
+        <div className="space-y-5">
+          <FormInput
+            label="اسم الفرع"
+            required
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+
+          <FormInput
+            label="كود الفرع"
+            required
+            value={form.code}
+            onChange={(e) => setForm({ ...form, code: e.target.value })}
+          />
+
+          {/* ✅ PhoneInputSimple */}
+          <PhoneInput
+            name="phone"
+            value={form.phone}
+            setValue={(key, val) =>
+              setForm((prev) => ({ ...prev, [key]: val }))
+            }
+          />
+          <FormInput
+            label="البريد الإلكتروني"
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+          />
+
+          <FormInput
+            label="اسم المدير"
+            value={form.manager_name}
+            onChange={(e) => setForm({ ...form, manager_name: e.target.value })}
+          />
+
+          <FormInput
+            label="العنوان"
+            required
+            value={form.address}
+            onChange={(e) => setForm({ ...form, address: e.target.value })}
+          />
+
+          <SelectInput
+            label="الحالة"
+            value={form.is_active}
+            onChange={(e) => setForm({ ...form, is_active: e.target.value })}
+            options={[
+              { value: "true", label: "نشط" },
+              { value: "false", label: "غير نشط" },
+            ]}
+          />
+
+          {/* ================= ACTIONS ================= */}
+          <StepButtonsSmart
+            step={step}
+            total={total}
+            isEdit={!!branch}
+            loading={loading}
+            onNext={handleSubmit}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
