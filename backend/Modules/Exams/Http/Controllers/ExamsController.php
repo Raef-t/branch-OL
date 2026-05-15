@@ -453,12 +453,7 @@ class ExamsController extends Controller
      *         description="لا توجد امتحانات مطابقة للفلاتر المحددة",
      *         @OA\JsonContent(
      *             @OA\Property(property="status", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="لا توجد امتحانات مطابقة للفلاتر المحددة"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="array",
-     *                 @OA\Items(type="object")
-     *             )
+     *             @OA\Property(property="message", type="string", example="لا توجد امتحانات في هذا التاريخ")
      *         )
      *     ),
      *
@@ -503,6 +498,88 @@ class ExamsController extends Controller
         return $this->successResponse(
             ExamResource::collection($exams),
             'تم جلب الامتحانات بنجاح',
+            200
+        );
+    }
+
+    /**
+     * جلب الامتحانات الخاصة بطالب محدد في تاريخ محدد
+     */
+    public function getExamsByStudentAndDate(Request $request, $student_id, string $date)
+    {
+        if (!\Carbon\Carbon::hasFormat($date, 'Y-m-d')) {
+            return $this->error('التاريخ غير صالح', 400);
+        }
+
+        $user = auth()->user();
+
+        // فحص الصلاحية (Authorization Check)
+        /** @var \Modules\Users\Models\User $user */
+        if (!$user->hasRole(['super_admin', 'admin', 'employee', 'supervisor', 'accountant', 'automation_staff'])) {
+            // إذا كان المستخدم طالباً
+            if ($user->hasRole('student')) {
+                if ($user->student?->id != $student_id) {
+                    return $this->error('غير مصرح لك بالوصول لبيانات هذا الطالب', 403);
+                }
+            } 
+            // إذا كان المستخدم ولي أمر (عائلة)
+            elseif ($user->hasRole(['family', 'parent'])) {
+                $isChild = $user->family?->students()->where('id', $student_id)->exists();
+                if (!$isChild) {
+                    return $this->error('هذا الطالب ليس من ضمن أفراد عائلتك المسجلين', 403);
+                }
+            } else {
+                return $this->error('صلاحيات غير كافية', 403);
+            }
+        }
+
+        $exams = Exam::query()
+            ->byDate($date)
+            ->whereHas('batchSubject.batch.batchStudents', function($q) use ($student_id) {
+                $q->where('student_id', $student_id);
+            })
+            ->with([
+                'batchSubject:id,batch_id,class_room_id,instructor_subject_id',
+                'batchSubject.batch:id,name,gender_type,institute_branch_id',
+                'batchSubject.classRoom:id,code',
+                'batchSubject.instructorSubject.subject:id,name',
+            ])
+            ->orderBy('exam_time')
+            ->get();
+
+        return $this->successResponse(
+            ExamResource::collection($exams),
+            'تم جلب امتحانات الطالب بنجاح',
+            200
+        );
+    }
+
+    /**
+     * جلب الامتحانات الخاصة بشعبة محددة في تاريخ محدد
+     */
+    public function getExamsByBatchAndDate(Request $request, $batch_id, string $date)
+    {
+        if (!\Carbon\Carbon::hasFormat($date, 'Y-m-d')) {
+            return $this->error('التاريخ غير صالح', 400);
+        }
+
+        $exams = Exam::query()
+            ->byDate($date)
+            ->whereHas('batchSubject', function($q) use ($batch_id) {
+                $q->where('batch_id', $batch_id);
+            })
+            ->with([
+                'batchSubject:id,batch_id,class_room_id,instructor_subject_id',
+                'batchSubject.batch:id,name,gender_type,institute_branch_id',
+                'batchSubject.classRoom:id,code',
+                'batchSubject.instructorSubject.subject:id,name',
+            ])
+            ->orderBy('exam_time')
+            ->get();
+
+        return $this->successResponse(
+            ExamResource::collection($exams),
+            'تم جلب امتحانات الشعبة بنجاح',
             200
         );
     }
@@ -824,36 +901,57 @@ class ExamsController extends Controller
      */
     public function getFilteredExams(Request $request)
     {
-        $batchId = $request->query('batch_id');
+        $batchId = $request->query('batch_id') ?: $request->query('batch_ids');
         $studentId = $request->query('student_id');
+        $branchId = $request->query('branch_id');
+        $subjectId = $request->query('subject_id');
 
-        // البداية: جلب الامتحانات مع الفلترة الصحيحة على مستوى الاستعلام الأساسي
         $examsQuery = Exam::query()
-            ->with(['examType', 'batchSubject.batch']);
+            ->with(['examType', 'batchSubject.batch', 'batchSubject.subject']);
 
-        // فلترة حسب الشعبة
-        $examsQuery->when($batchId, function($q) use ($batchId) {
-            $q->whereHas('batchSubject', function($q) use ($batchId) {
-                $q->where('batch_id', $batchId);
+        // 1. فلترة حسب الفرع
+        if ($branchId) {
+            $examsQuery->whereHas('batchSubject.batch', function($q) use ($branchId) {
+                $q->where('institute_branch_id', $branchId);
             });
-        });
+        }
 
-        // فلترة حسب الطالب
-        $examsQuery->when($studentId, function($q) use ($studentId) {
-            $q->whereHas('batchSubject.batch.batchStudents', function($q) use ($studentId) {
+        // 2. فلترة حسب الشعبة
+        if ($batchId) {
+            $examsQuery->whereHas('batchSubject', function($q) use ($batchId) {
+                if (is_array($batchId)) {
+                    $q->whereIn('batch_id', array_filter($batchId));
+                } else {
+                    $q->where('batch_id', $batchId);
+                }
+            });
+        }
+
+        // 3. فلترة حسب المادة (بشكل مباشر وصارم)
+        if ($subjectId && $subjectId !== 'all') {
+            $examsQuery->whereHas('batchSubject', function($q) use ($subjectId) {
+                $q->where('subject_id', $subjectId);
+            });
+        }
+
+        // 4. فلترة حسب الطالب
+        if ($studentId && $studentId !== 'all') {
+            $examsQuery->whereHas('batchSubject.batch.batchStudents', function($q) use ($studentId) {
                 $q->where('student_id', $studentId);
             });
-        });
+        }
 
-        $exams = $examsQuery->get();
+        $exams = $examsQuery->latest('exam_date')->get();
 
         // تجهيز الـ response
         $response = $exams->map(function($exam) {
             return [
                 'id'            => $exam->id,
-                'batch_subject_id'      => $exam->batchSubject->id,
+                'batch_subject_id' => $exam->batchSubject?->id,
+                'batch_id'      => $exam->batchSubject?->batch_id, // ضروري للفلترة في الفرونت
+                'subject_id'    => $exam->batchSubject?->subject_id, // ضروري للفلترة في الفرونت
                 'name'          => $exam->name,
-                'exam_date'     => $exam->exam_date->format('Y-m-d'),
+                'exam_date'     => $exam->exam_date?->format('Y-m-d'),
                 'exam_time'     => $exam->exam_time,
                 'exam_type'     => $exam->examType?->name ?? null,
                 'total_marks'   => $exam->total_marks,

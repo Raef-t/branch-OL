@@ -14,10 +14,13 @@ class AssignSubjectToBatchRequest extends FormRequest
     public function rules()
     {
         return [
-            'batch_id' => 'required|integer|exists:batches,id',
-            'instructor_subject_id' => 'required|integer|exists:instructor_subjects,id',
-            'weekly_lessons' => 'required|integer|min:1',
-            'notes' => 'nullable|string|max:500',
+            'batch_id' => 'sometimes|required|integer|exists:batches,id',
+            'subject_id' => 'sometimes|required|integer|exists:subjects,id',
+            'instructor_subject_id' => 'sometimes|nullable|integer|exists:instructor_subjects,id',
+            'weekly_lessons' => 'sometimes|required|integer|min:1',
+            'notes' => 'sometimes|nullable|string|max:500',
+            'allow_same_subject_same_day' => 'sometimes|nullable|boolean',
+            'max_lessons_per_day' => 'sometimes|nullable|integer|min:1',
         ];
     }
 

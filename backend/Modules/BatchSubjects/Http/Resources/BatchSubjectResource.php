@@ -15,8 +15,8 @@ class BatchSubjectResource extends JsonResource
                 'name' => $this->batch->name,
             ],
             'subject' => [
-                'id' => $this->instructorSubject->subject->id ?? null,
-                'name' => $this->instructorSubject->subject->name ?? null,
+                'id' => $this->subject->id ?? null,
+                'name' => $this->subject->name ?? null,
             ],
             'instructor' => [
                 'id' => $this->instructorSubject->instructor->id ?? null,

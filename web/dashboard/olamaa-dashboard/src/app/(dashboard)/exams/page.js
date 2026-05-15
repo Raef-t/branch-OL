@@ -23,11 +23,14 @@ import {
   useUpdateExamResultMutation,
   useDeleteExamResultMutation,
 } from "@/store/services/examsApi";
+import { useLazyGetBatchSubjectsQuery } from "@/store/services/batcheSubjectsApi";
+import { useGetExamTypesQuery } from "@/store/services/examTypesApi";
 
 import ExamsTable from "./components/ExamsTable";
 import ExamResultsTable from "./components/ExamResultsTable";
 import ExamAddModal from "./components/ExamAddModal";
 import ExamResultAddModal from "./components/ExamResultAddModal";
+import ExamResultBulkAddModal from "./components/ExamResultBulkAddModal";
 import PageSkeleton from "@/components/common/PageSkeleton";
 import PrintExportActions from "@/components/common/PrintExportActions";
 
@@ -44,6 +47,7 @@ function matchesBatch(row, batchId) {
   if (toId(row?.institute_batch_id) === wanted) return true;
   if (toId(row?.academic_batch_id) === wanted) return true;
   if (toId(row?.batch?.id) === wanted) return true;
+  if (toId(row?.batch_subject?.batch_id) === wanted) return true;
   if (Array.isArray(row?.batches)) {
     if (row.batches.some((b) => toId(b?.id) === wanted)) return true;
   }
@@ -73,6 +77,18 @@ function matchesStudent(row, studentId) {
   }
   return false;
 }
+
+function matchesSubject(row, subjectId) {
+  if (!subjectId) return true;
+  const wanted = String(subjectId);
+  return (
+    toId(row?.subject_id) === wanted ||
+    toId(row?.batch_subject?.subject_id) === wanted ||
+    toId(row?.batch_subject_id) === wanted ||
+    toId(row?.batch_subject?.id) === wanted
+  );
+}
+
 function normalizeArray(res) {
   if (!res) return [];
   if (Array.isArray(res)) return res;
@@ -102,10 +118,12 @@ function normalizeObject(res) {
   return null;
 }
 
-function buildParams({ studentId, batchId }) {
+function buildParams({ studentId, batchId, branchId, subjectId }) {
   const p = {};
   if (studentId) p.student_id = Number(studentId);
   if (batchId) p.batch_id = Number(batchId);
+  if (branchId) p.branch_id = Number(branchId);
+  if (subjectId) p.subject_id = Number(subjectId);
   return p;
 }
 
@@ -146,18 +164,48 @@ export default function ExamsPage() {
   const [mode, setMode] = useState("exams");
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [selectedBatchId, setSelectedBatchId] = useState("");
+  const [selectedSubjectId, setSelectedSubjectId] = useState("");
+  const globalBranchId = useSelector((state) => state.search.values.branch);
 
-  const { data: studentsRes } = useGetStudentsDetailsQuery();
+  const { data: studentsRes } = useGetStudentsDetailsQuery({ 
+    batch_id: selectedBatchId,
+    institute_branch_id: globalBranchId 
+  }, { skip: !globalBranchId }); // تجنب الطلب إذا لم يتم اختيار فرع بعد
   const students = useMemo(() => normalizeArray(studentsRes), [studentsRes]);
 
-  const { data: batchesRes } = useGetBatchesQuery();
+  // تصفير الفلاتر الفرعية عند تغيير الشعبة أو الوضع
+  useEffect(() => {
+    setSelectedStudentId("");
+    setSelectedSubjectId("");
+  }, [selectedBatchId]);
+
+  useEffect(() => {
+    if (mode === "exams") {
+      setSelectedStudentId("");
+    }
+  }, [mode]);
+
+  const { data: batchesRes } = useGetBatchesQuery({ 
+    institute_branch_id: globalBranchId,
+    per_page: 1000 
+  });
   const batches = useMemo(() => normalizeArray(batchesRes), [batchesRes]);
+  
+  const [triggerGetSubjects, { data: subjectsRes, isFetching: loadingSubjects }] = useLazyGetBatchSubjectsQuery();
+  const { data: typesRes } = useGetExamTypesQuery();
+  const examTypes = useMemo(() => normalizeArray(typesRes), [typesRes]);
+
   const search = useSelector((state) => state.search.values.exams);
 
   const params = useMemo(
     () =>
-      buildParams({ studentId: selectedStudentId, batchId: selectedBatchId }),
-    [selectedStudentId, selectedBatchId],
+      buildParams({ 
+        studentId: selectedStudentId, 
+        batchId: selectedBatchId, 
+        branchId: globalBranchId,
+        subjectId: selectedSubjectId 
+      }),
+    [selectedStudentId, selectedBatchId, globalBranchId, selectedSubjectId],
   );
 
   const {
@@ -180,10 +228,23 @@ export default function ExamsPage() {
 
   const exams = useMemo(() => normalizeArray(examsRes), [examsRes]);
 
+  const subjectOptions = useMemo(() => {
+    const rawData = subjectsRes?.data || subjectsRes;
+    const arr = Array.isArray(rawData) ? rawData : Array.isArray(rawData?.subjects) ? rawData.subjects : [];
+    
+    return [
+      { value: "", label: "كل المواد" },
+      ...arr.map((s) => ({
+        value: String(s.subject_id || s.id),
+        label: s.name || s.subject_name || s.subject_instructor_name || s.subject?.name,
+      })).filter(s => s.label),
+    ];
+  }, [subjectsRes]);
+
   const loading =
     mode === "exams"
-      ? loadingExams || fetchingExams
-      : loadingResults || fetchingResults;
+      ? loadingExams
+      : loadingResults;
 
   const rows = useMemo(() => {
     if (mode === "exams") return exams;
@@ -208,10 +269,13 @@ export default function ExamsPage() {
   const filteredRows = useMemo(() => {
     let data = [...rows];
     if (mode === "exams") {
+      // الـ API الآن يقوم بمعظم الفلترة، ولكن سنبقي على الفلترة اليدوية كطبقة إضافية 
+      // لضمان تزامن البيانات المعروضة مع الفلاتر المختارة في الواجهة
       data = data.filter((r) => {
         const okStudent = matchesStudent(r, selectedStudentId);
         const okBatch = matchesBatch(r, selectedBatchId);
-        return okStudent && okBatch;
+        const okSubject = matchesSubject(r, selectedSubjectId);
+        return okStudent && okBatch && okSubject;
       });
     }
     if (!search?.trim()) return data;
@@ -231,7 +295,7 @@ export default function ExamsPage() {
         String(r?.is_passed ?? "").toLowerCase().includes(q)
       );
     });
-  }, [rows, search, mode, selectedStudentId, selectedBatchId]);
+  }, [rows, search, mode, selectedStudentId, selectedBatchId, selectedSubjectId]);
 
   const [selectedIds, setSelectedIds] = useState([]);
   const isAllSelected =
@@ -239,7 +303,21 @@ export default function ExamsPage() {
 
   useEffect(() => {
     setSelectedIds([]);
-  }, [mode, selectedStudentId, selectedBatchId, search]);
+  }, [mode, selectedStudentId, selectedBatchId, globalBranchId, search]);
+
+  // تصفير الشعبة والطالب عند تغيير الفرع
+  useEffect(() => {
+    setSelectedBatchId("");
+    setSelectedStudentId("");
+    setSelectedSubjectId("");
+  }, [globalBranchId]);
+
+  useEffect(() => {
+    setSelectedSubjectId("");
+    if (selectedBatchId) {
+      triggerGetSubjects(selectedBatchId);
+    }
+  }, [selectedBatchId, triggerGetSubjects]);
 
   const exportColumns = useMemo(() => {
     if (mode === "exams") {
@@ -267,6 +345,9 @@ export default function ExamsPage() {
   /* ================= ADD ================= */
   const [openAddExam, setOpenAddExam] = useState(false);
   const [openAddResult, setOpenAddResult] = useState(false);
+  const [openBulkAdd, setOpenBulkAdd] = useState(false);
+  const [bulkAddExam, setBulkAddExam] = useState(null);
+
   const [addExam, { isLoading: addingExam }] = useAddExamMutation();
   const [addExamResult, { isLoading: addingResult }] = useAddExamResultMutation();
 
@@ -275,6 +356,14 @@ export default function ExamsPage() {
       const res = await addExam(payload).unwrap();
       notify.success(res?.message || "تمت إضافة المذاكرة");
       setOpenAddExam(false);
+
+      // Check for auto redirect
+      const typeId = payload.exam_type_id;
+      const examType = examTypes.find(t => String(t.id) === String(typeId));
+      if (examType?.auto_redirect_to_marks_entry) {
+        const examData = res?.data || res;
+        handleBulkAddMarks(examData);
+      }
     } catch (err) {
       notify.error(firstErr(err) || err?.data?.message || "فشل إضافة المذاكرة");
     }
@@ -289,6 +378,11 @@ export default function ExamsPage() {
       notify.error(firstErr(err) || err?.data?.message || "فشل إضافة العلامة");
       throw err;
     }
+  };
+
+  const handleBulkAddMarks = (exam) => {
+    setBulkAddExam(exam);
+    setOpenBulkAdd(true);
   };
 
   /* ================= EDIT/DELETE EXAMS ================= */
@@ -424,13 +518,13 @@ export default function ExamsPage() {
 
   if (loading) {
     const tableHeaders = mode === "exams"
-        ? ["#", "اسم المذاكرة", "التاريخ", "نوع الامتحان", "الوقت", "العلامة العظمى", "علامة النجاح", "الحالة", "إجراءات"]
+        ? ["#", "الاسم", "التاريخ", "النوع", "الوقت", "العلامة العظمى", "علامة النجاح", "الحالة", "إجراءات"]
         : ["#", "الطالب", "المادة", "نوع الإمتحان", "التاريخ", "العلامة", "النتيجة", "الإجراءات"];
     return (
       <div dir="rtl" className="w-full h-full p-6 flex flex-col gap-6">
         <div className="flex flex-col md:flex-row gap-2 justify-between items-start">
           <div className="space-y-1">
-            <h1 className="text-lg font-semibold">{mode === "exams" ? "مذكرات الدورة" : "علامات الامتحانات"}</h1>
+            <h1 className="text-lg font-semibold">{mode === "exams" ? "الامتحانات والاختبارات" : "علامات الامتحانات"}</h1>
             <Breadcrumb />
           </div>
         </div>
@@ -449,19 +543,30 @@ export default function ExamsPage() {
         <div className="flex flex-col gap-4 items-start md:items-end">
           <div className="flex flex-wrap gap-4">
             <SearchableSelect
-              label="اسم الطالب"
-              value={selectedStudentId}
-              onChange={setSelectedStudentId}
-              options={[{ value: "", label: "كل الطلاب" }, ...students.map((s) => ({ value: String(s.id), label: s.full_name }))]}
-              allowClear
-            />
-            <SearchableSelect
               label="الشعبة"
               value={selectedBatchId}
               onChange={setSelectedBatchId}
               options={[{ value: "", label: "كل الشعب" }, ...batches.map((b) => ({ value: String(b.id), label: b.name }))]}
               allowClear
             />
+            <SearchableSelect
+              label="المادة"
+              value={selectedSubjectId}
+              onChange={setSelectedSubjectId}
+              options={subjectOptions}
+              placeholder={!selectedBatchId ? "اختر شعبة أولاً" : loadingSubjects ? "جاري التحميل..." : "كل المواد"}
+              disabled={!selectedBatchId || loadingSubjects}
+              allowClear
+            />
+            {mode === "results" && (
+              <SearchableSelect
+                label="اسم الطالب"
+                value={selectedStudentId}
+                onChange={setSelectedStudentId}
+                options={[{ value: "", label: "كل الطلاب" }, ...students.map((s) => ({ value: String(s.id), label: s.full_name }))]}
+                allowClear
+              />
+            )}
           </div>
           <div className="flex gap-2">
             <PrintExportActions 
@@ -492,6 +597,7 @@ export default function ExamsPage() {
           onSelectChange={setSelectedIds}
           onEdit={handleEditExam}
           onDelete={handleDeleteExam}
+          onBulkAdd={handleBulkAddMarks}
         />
       ) : (
         <ExamResultsTable
@@ -506,7 +612,31 @@ export default function ExamsPage() {
 
       <ExamAddModal open={openAddExam} onClose={() => setOpenAddExam(false)} onSubmit={submitAddExam} loading={addingExam} />
       <ExamResultAddModal open={openAddResult} onClose={() => setOpenAddResult(false)} onSubmit={submitAddResult} loading={addingResult} filterParams={params} />
+      
+      <ExamResultBulkAddModal 
+        open={openBulkAdd} 
+        exam={bulkAddExam} 
+        onClose={() => {
+          setOpenBulkAdd(false);
+          setBulkAddExam(null);
+        }} 
+      />
+
       <ExamAddModal open={openEditExam} title="تعديل مذاكرة" onClose={() => { setOpenEditExam(false); setActiveExamId(null); }} onSubmit={submitEditExam} initialData={activeExam} loading={updatingExam || loadingExamDetails} />
+      
+      <ExamResultAddModal
+        open={openEditResult}
+        title="تعديل علامة"
+        onClose={() => {
+          setOpenEditResult(false);
+          setActiveResultId(null);
+        }}
+        onSubmit={submitEditResult}
+        initialData={activeResult}
+        loading={updatingResult || loadingResultDetails}
+        showReason={true}
+        filterParams={params}
+      />
       
       <DeleteConfirmModal
         isOpen={openDeleteExam}

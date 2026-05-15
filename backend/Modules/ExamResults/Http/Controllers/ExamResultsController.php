@@ -19,6 +19,7 @@ use Modules\ExamResults\Http\Resources\ExamResultEditRequestResource;
 use Modules\ExamResults\Http\Requests\FilterExamResultsRequest;
 use Modules\ExamResults\Http\Resources\ExamResultDetailResource;
 use Modules\ExamResults\Services\ExamResultFilterService;
+use Modules\ExamResults\Http\Requests\BulkStoreExamResultRequest;
 use Modules\Exams\Models\Exam;
 
 class ExamResultsController extends Controller
@@ -85,6 +86,83 @@ class ExamResultsController extends Controller
             'تم جلب جميع نتائج الامتحانات بنجاح',
             200
         );
+    }
+
+     /**
+     * إحصائيات الداشبورد: الطلاب المتفوقين وأصحاب أعلى المعدلات
+     */
+    public function dashboardStats()
+    {
+        try {
+            $oneMonthAgo = now()->subDays(30);
+
+            // حساب المتوسط المئوي لكل طالب بناءً على امتحانات الشهر الأخير فقط
+            $studentAverages = DB::table('exam_results')
+                ->join('exams', 'exam_results.exam_id', '=', 'exams.id')
+                ->join('students', 'exam_results.student_id', '=', 'students.id')
+                ->select(
+                    'students.id as student_id',
+                    'students.first_name',
+                    'students.last_name',
+                    DB::raw('ROUND(AVG(exam_results.obtained_marks / exams.total_marks * 100), 2) as average_percent'),
+                    DB::raw('COUNT(exam_results.id) as total_exams')
+                )
+                ->where('exams.total_marks', '>', 0)
+                ->where('exams.exam_date', '>=', $oneMonthAgo) // فلترة الامتحانات في آخر 30 يوم
+                ->groupBy('students.id', 'students.first_name', 'students.last_name')
+                ->having('total_exams', '>=', 1)
+                ->orderByDesc('average_percent')
+                ->get();
+
+            $totalStudentsWithResults = $studentAverages->count();
+
+            // 1) الطلاب الحاصلين على متوسط 90% فما فوق خلال الشهر
+            $above90Ids = $studentAverages->where('average_percent', '>=', 90)->pluck('student_id');
+            $above90Students = \Modules\Students\Models\Student::whereIn('id', $above90Ids)->get();
+            
+            $above90Count = $above90Ids->count();
+            $above90Percent = $totalStudentsWithResults > 0
+                ? round(($above90Count / $totalStudentsWithResults) * 100, 1)
+                : 0;
+
+            // جلب بيانات الطلاب كاملة (لفك التشفير) لأعلى 10 طلاب
+            $topIds = $studentAverages->take(10)->pluck('student_id');
+            $topEloquentStudents = \Modules\Students\Models\Student::whereIn('id', $topIds)->get()->keyBy('id');
+
+            // 2) أعلى 10 طلاب بناءً على أفضل علامة حصلوا عليها
+            $topStudents = $studentAverages->take(10)->map(function ($s) use ($topEloquentStudents) {
+                $student = $topEloquentStudents->get($s->student_id);
+                $firstName = $student ? $student->first_name : $s->first_name;
+                $lastName = $student ? $student->last_name : $s->last_name;
+
+                return [
+                    'student_id'      => $s->student_id,
+                    'name'            => $firstName . ' ' . $lastName,
+                    'average_percent' => $s->average_percent,
+                    'total_exams'     => $s->total_exams,
+                    'initials'        => mb_substr($firstName ?? '', 0, 1) . mb_substr($lastName ?? '', 0, 1),
+                ];
+            })->values();
+
+            return $this->successResponse([
+                'above_90' => [
+                    'count'   => $above90Count,
+                    'percent' => $above90Percent,
+                    'students' => $above90Students->take(5)->map(function($s) use ($studentAverages) {
+                        return [
+                            'student_id' => $s->id,
+                            'name'       => $s->first_name . ' ' . $s->last_name,
+                            'average'    => $studentAverages->firstWhere('student_id', $s->id)->average_percent,
+                            'initials'   => mb_substr($s->first_name ?? '', 0, 1) . mb_substr($s->last_name ?? '', 0, 1),
+                        ];
+                    })->values(),
+                ],
+                'top_students' => $topStudents,
+                'total_students_with_results' => $totalStudentsWithResults,
+            ], 'تم جلب إحصائيات الداشبورد بنجاح');
+        } catch (\Exception $e) {
+            return $this->error('حدث خطأ أثناء جلب الإحصائيات: ' . $e->getMessage(), 500);
+        }
     }
 
     /**
@@ -977,6 +1055,7 @@ class ExamResultsController extends Controller
     {
         $studentId = $request->query('student_id'); // اختياري
         $batchId   = $request->query('batch_id');   // اختياري
+        $subjectId = $request->query('subject_id'); // اختياري
 
         $results = collect();
 
@@ -1000,6 +1079,17 @@ class ExamResultsController extends Controller
             if ($batchId) {
                 $examResultsQuery->whereHas('exam.batchSubject', function ($q) use ($batchId) {
                     $q->where('batch_id', $batchId);
+                });
+            } else if ($request->query('branch_id')) {
+                $branchId = $request->query('branch_id');
+                $examResultsQuery->whereHas('exam.batchSubject.batch', function ($q) use ($branchId) {
+                    $q->where('institute_branch_id', $branchId);
+                });
+            }
+
+            if ($subjectId) {
+                $examResultsQuery->whereHas('exam.batchSubject', function ($q) use ($subjectId) {
+                    $q->where('subject_id', $subjectId);
                 });
             }
 
@@ -1032,6 +1122,7 @@ class ExamResultsController extends Controller
 
                     'total_marks'        => $exam->total_marks,
                     'passing_marks'      => $exam->passing_marks,
+                    'created_at'         => $examResult->created_at,
                 ]);
             }
         }
@@ -1058,6 +1149,17 @@ class ExamResultsController extends Controller
             if ($batchId) {
                 $examResultsQuery->whereHas('exam.batchSubject', function ($q) use ($batchId) {
                     $q->where('batch_id', $batchId);
+                });
+            } else if ($request->query('branch_id')) {
+                $branchId = $request->query('branch_id');
+                $examResultsQuery->whereHas('exam.batchSubject.batch', function ($q) use ($branchId) {
+                    $q->where('institute_branch_id', $branchId);
+                });
+            }
+
+            if ($subjectId) {
+                $examResultsQuery->whereHas('exam.batchSubject', function ($q) use ($subjectId) {
+                    $q->where('subject_id', $subjectId);
                 });
             }
 
@@ -1096,6 +1198,7 @@ class ExamResultsController extends Controller
 
                     'total_marks'        => $exam->total_marks,
                     'passing_marks'      => $exam->passing_marks,
+                    'created_at'         => $examResult->created_at,
                 ]);
             }
         }
@@ -1280,6 +1383,53 @@ class ExamResultsController extends Controller
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Exam Edit Requests Error: " . $e->getMessage());
             return $this->error('حدث خطأ أثناء جلب طلبات التعديل: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * إضافة نتائج امتحانات بشكل جماعي
+     */
+    public function bulkStore(BulkStoreExamResultRequest $request)
+    {
+        DB::beginTransaction();
+        try {
+            $examId = $request->exam_id;
+            $results = $request->results;
+
+            $exam = Exam::findOrFail($examId);
+            $passingMarks = $exam->passing_marks;
+
+            $savedResults = [];
+
+            foreach ($results as $item) {
+                $obtainedMarks = $item['obtained_marks'];
+                $isPassed = $passingMarks !== null ? ($obtainedMarks >= $passingMarks) : true;
+
+                $result = ExamResult::updateOrCreate(
+                    [
+                        'exam_id' => $examId,
+                        'student_id' => $item['student_id'],
+                    ],
+                    [
+                        'obtained_marks' => $obtainedMarks,
+                        'is_passed' => $isPassed,
+                        'remarks' => $item['remarks'] ?? null,
+                    ]
+                );
+
+                $savedResults[] = $result;
+            }
+
+            DB::commit();
+
+            return $this->successResponse(
+                ExamResultResource::collection($savedResults),
+                'تم حفظ نتائج جميع الطلاب بنجاح',
+                201
+            );
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->error('حدث خطأ أثناء حفظ النتائج الجماعية: ' . $e->getMessage(), 500);
         }
     }
 }

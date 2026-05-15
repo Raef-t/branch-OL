@@ -1,134 +1,84 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useSelector } from "react-redux";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Edit, Trash2, ArrowRight } from "lucide-react";
 
+import PageSkeleton from "@/components/common/PageSkeleton";
 import DataTable from "@/components/common/DataTable";
 import Breadcrumb from "@/components/common/Breadcrumb";
 import PrintExportActions from "@/components/common/PrintExportActions";
 import ActionsRow from "@/components/common/ActionsRow";
 
 import AddBatchSubjectModal from "../components/AddBatchSubjectModal";
+import { useGetBatchSubjectsQuery, useDeleteBatchSubjectMutation } from "@/store/services/batcheSubjectsApi";
+import { notify } from "@/lib/helpers/toastify";
 
-const MOCK_BATCH_SUBJECTS = [
-  {
-    id: 1,
-    subject_name: "رياضيات",
-    teacher_name: "الاء",
-    max_mark: 200,
-    min_mark: 200,
-    quizzes_count: 4,
-    academic_year: "2024-2025",
-  },
-  {
-    id: 2,
-    subject_name: "جغرافيا",
-    teacher_name: "سنا",
-    max_mark: 600,
-    min_mark: 600,
-    quizzes_count: 6,
-    academic_year: "2024-2025",
-  },
-  {
-    id: 3,
-    subject_name: "عربي",
-    teacher_name: "روان",
-    max_mark: 700,
-    min_mark: 700,
-    quizzes_count: 3,
-    academic_year: "2024-2025",
-  },
-  {
-    id: 4,
-    subject_name: "فيزياء",
-    teacher_name: "رند",
-    max_mark: 800,
-    min_mark: 800,
-    quizzes_count: 2,
-    academic_year: "2024-2025",
-  },
-  {
-    id: 5,
-    subject_name: "تاريخ",
-    teacher_name: "ريماس",
-    max_mark: 300,
-    min_mark: 300,
-    quizzes_count: 9,
-    academic_year: "2024-2025",
-  },
-  {
-    id: 6,
-    subject_name: "كيمياء",
-    teacher_name: "ميس",
-    max_mark: 400,
-    min_mark: 400,
-    quizzes_count: 8,
-    academic_year: "2024-2025",
-  },
-  {
-    id: 7,
-    subject_name: "ديانة",
-    teacher_name: "هبة",
-    max_mark: 200,
-    min_mark: 200,
-    quizzes_count: 6,
-    academic_year: "2024-2025",
-  },
-  {
-    id: 8,
-    subject_name: "عربي",
-    teacher_name: "دينا",
-    max_mark: 100,
-    min_mark: 100,
-    quizzes_count: 5,
-    academic_year: "2024-2025",
-  },
-  {
-    id: 9,
-    subject_name: "رياضيات",
-    teacher_name: "إسراء",
-    max_mark: 200,
-    min_mark: 200,
-    quizzes_count: 2,
-    academic_year: "2024-2025",
-  },
-  {
-    id: 10,
-    subject_name: "فيزياء",
-    teacher_name: "ليلاس",
-    max_mark: 300,
-    min_mark: 300,
-    quizzes_count: 1,
-    academic_year: "2024-2025",
-  },
-  {
-    id: 11,
-    subject_name: "كيمياء",
-    teacher_name: "تالين",
-    max_mark: 400,
-    min_mark: 400,
-    quizzes_count: 6,
-    academic_year: "2024-2025",
-  },
-];
+// Mock data removed
 
 export default function BatchSubjectsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const batchId = searchParams.get("id");
   const batchName = searchParams.get("batch") || "علمي بنات";
 
+  const { data: batchSubjectsRes, isLoading, refetch } = useGetBatchSubjectsQuery(batchId, { skip: !batchId });
+  const [deleteBatchSubject] = useDeleteBatchSubjectMutation();
+
+  const navSearch = useSelector((s) => s.search?.values?.subjects || "");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
 
+  const batchSubjects = useMemo(() => batchSubjectsRes?.data || [], [batchSubjectsRes]);
+
+  const filteredData = useMemo(() => {
+    const q = (navSearch || "").trim().toLowerCase();
+    if (!q) return batchSubjects;
+    return batchSubjects.filter((s) => 
+      String(s.subject_name || "").toLowerCase().includes(q) ||
+      String(s.instructor_name || "").toLowerCase().includes(q)
+    );
+  }, [navSearch, batchSubjects]);
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [navSearch]);
+
   const columns = [
-    { header: "المادة", key: "subject_name" },
-    { header: "المدرس", key: "teacher_name" },
-    { header: "العلامة العظمى", key: "max_mark" },
-    { header: "العلامة الدنيا", key: "min_mark" },
-    { header: "عدد المذاكرات في الاسبوع", key: "quizzes_count" },
+    { 
+      header: "المادة", 
+      key: "subject_name",
+      render: (v) => <span className="font-bold text-gray-800">{v}</span>
+    },
+    { 
+      header: "المدرس", 
+      key: "instructor_name",
+      render: (v) => v === "غير محدد" ? (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 text-orange-600 text-xs font-medium border border-orange-100">
+          <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
+          بانتظار تعيين مدرس
+        </span>
+      ) : v
+    },
+    { header: "الحصص الأسبوعية", key: "weekly_lessons" },
+    {
+      header: "تكرار يومي",
+      key: "allow_same_subject_same_day",
+      render: (v) => (v ? "مسموح" : "غير مسموح")
+    },
+    { header: "أقصى حصص/يوم", key: "max_lessons_per_day", render: (v) => v || "—" },
   ];
+
+  if (isLoading) {
+    return (
+      <PageSkeleton 
+        tableHeaders={["المادة", "المدرس", "العلامة العظمى", "العلامة الدنيا", "المذاكرات"]}
+        rows={8}
+      />
+    );
+  }
 
   const handleEdit = (subject) => {
     setSelectedSubject(subject);
@@ -168,23 +118,23 @@ export default function BatchSubjectsPage() {
       {/* Actions */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <ActionsRow
-          addLabel="إضافة مادة"
-          onAdd={handleAdd}
+          addLabel=""
+          onAdd={null}
           viewLabel=""
           showSelectAll={true}
-          isAllSelected={selectedIds.length === MOCK_BATCH_SUBJECTS.length}
+          isAllSelected={filteredData.length > 0 && selectedIds.length === filteredData.length}
           onToggleSelectAll={() =>
             setSelectedIds(
-              selectedIds.length === MOCK_BATCH_SUBJECTS.length
+              selectedIds.length === filteredData.length
                 ? []
-                : MOCK_BATCH_SUBJECTS.map((s) => String(s.id)),
+                : filteredData.map((s) => String(s.id)),
             )
           }
         />
 
         <div className="flex items-center gap-2">
           <PrintExportActions
-            data={MOCK_BATCH_SUBJECTS}
+            data={filteredData}
             selectedIds={selectedIds}
             columns={[
               { header: "#", key: "id" },
@@ -202,7 +152,7 @@ export default function BatchSubjectsPage() {
 
       {/* Table */}
       <DataTable
-        data={MOCK_BATCH_SUBJECTS}
+        data={filteredData}
         columns={columns}
         pageSize={10}
         selectedIds={selectedIds}
@@ -217,6 +167,17 @@ export default function BatchSubjectsPage() {
               <Edit size={18} />
             </button>
             <button
+              onClick={async () => {
+                if (window.confirm("هل أنت متأكد من حذف هذه المادة من الدورة؟")) {
+                  try {
+                    await deleteBatchSubject(row.id).unwrap();
+                    notify.success("تم حذف المادة بنجاح");
+                    refetch();
+                  } catch (err) {
+                    notify.error("حدث خطأ أثناء الحذف");
+                  }
+                }
+              }}
               className="text-[#EF4444] hover:opacity-70 transition p-1"
               title="حذف"
             >
@@ -229,8 +190,12 @@ export default function BatchSubjectsPage() {
       {/* Add/Edit Modal */}
       <AddBatchSubjectModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        subject={selectedSubject}
+        onClose={() => {
+          setIsModalOpen(false);
+          refetch();
+        }}
+        editingSubject={selectedSubject}
+        batchId={batchId}
         batchName={batchName}
       />
     </div>

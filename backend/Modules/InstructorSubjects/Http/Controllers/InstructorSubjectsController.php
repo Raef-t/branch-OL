@@ -67,10 +67,8 @@ class InstructorSubjectsController extends Controller
             return $this->error('لا يوجد أي مدرس مرتبط بهذه المادة حالياً', 404);
         }
 
-        $instructors = $instructorSubjects->pluck('instructor');
-
         return $this->successResponse(
-            InstructorResource::collection($instructors),
+            $instructorSubjects,
             'تم جلب المدرسين المرتبطين بالمادة بنجاح',
             200
         );
